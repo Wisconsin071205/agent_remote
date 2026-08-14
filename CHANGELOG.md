@@ -4,6 +4,19 @@
 
 ## [未发布] — 确定性工作流内核（进行中）
 
+### 状态机与修复策略（第 3~4 周）
+- workflow_state.py：显式状态机 PREPARED→VALIDATED→APPROVED→SUBMITTED→RUNNING→
+  FINISHED→PARSED→REVIEWED；合法转换表校验、附加审计历史、异常终态
+  （FAILED/TIMEOUT/REJECTED），REVIEWED 为最终态、异常态不可复活
+- apply_patch.py：L2 补丁应用器——白名单文件（默认仅 INCAR）、进程内严格
+  unified-diff 引擎（行号精确校验，失败整体拒绝）、.pre-*.bak 备份、
+  .vaspilot-patches.jsonl 审计（前后哈希+补丁哈希+操作者）、--dry-run
+- agent_tools.py：中心智能体高层工具面——10 个受约束工具 schema
+  （prepare_workflow/validate_calculation/preview_changes/
+  submit_approved_workflow/query_job_state/query_vasp_progress/
+  diagnose_failure/propose_recovery/parse_results/generate_report）
+  + 确定性分发器；模型无 Shell，提交强制 approval_ref 非空
+
 ### 安全整改
 - remove 从「永久递归删除」改为「移入时间戳隔离区 .vaspilot-trash（可恢复）」；
   新增 purge（仅限隔离区内路径 + 路径双重确认）与 trash-list 命令；

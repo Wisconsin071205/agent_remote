@@ -101,6 +101,37 @@ def main() -> int:
         result = run(str(SCRIPTS / "slurm_adapter.py"), "selftest", check=False)
         check("slurm_adapter selftest", result.returncode == 0)
 
+        # 5. workflow_state machine
+        state_result = run(str(SCRIPTS / "workflow_state.py"), "selftest", check=False)
+        check("workflow_state selftest", state_result.returncode == 0)
+        calc_dir = out_dir / "Smoke" / "00_relax"
+        run(str(SCRIPTS / "workflow_state.py"), "init", str(calc_dir),
+            "--workflow", "relax-static", "--plan-sha", plan["plan_sha256"], "--by", "test-tools")
+        run(str(SCRIPTS / "workflow_state.py"), "advance", str(calc_dir),
+            "--to", "VALIDATED", "--by", "test-tools", "--note", "smoke")
+        status = json.loads(run(str(SCRIPTS / "workflow_state.py"), "status", str(calc_dir)).stdout)
+        check("state advanced VALIDATED", status["state"] == "VALIDATED" and len(status["history"]) == 2)
+
+        # 6. apply_patch L2 (detect -> propose -> dry-run -> apply -> audit)
+        run(str(SCRIPTS / "custodian_detect.py"), str(src), "--propose")
+        patch = src / "INCAR.proposed.patch"
+        dry = run(str(SCRIPTS / "apply_patch.py"), str(src), "--patch", str(patch), "--dry-run")
+        check("apply_patch dry-run", "dry-run: nothing written" in dry.stdout)
+        incar_before_apply = (src / "INCAR").read_text(encoding="utf-8")
+        run(str(SCRIPTS / "apply_patch.py"), str(src), "--patch", str(patch), "--by", "test-tools")
+        applied = (src / "INCAR").read_text(encoding="utf-8")
+        check("apply_patch applied", applied != incar_before_apply and "ICHARG = 1" in applied)
+        audit_lines = (src / ".vaspilot-patches.jsonl").read_text(encoding="utf-8").strip().splitlines()
+        check("apply_patch audit", len(audit_lines) == 1 and json.loads(audit_lines[0])["by"] == "test-tools")
+        bad_patch = src / "POSCAR.patch"
+        bad_patch.write_text("--- POSCAR (original)\n+++ POSCAR (proposed)\n@@ -1,1 +1,1 @@\n-Evil\n+Hacked\n", encoding="utf-8")
+        refused = run(str(SCRIPTS / "apply_patch.py"), str(src), "--patch", str(bad_patch), check=False)
+        check("apply_patch rejects non-whitelist", refused.returncode != 0 and "allow list" in refused.stderr)
+
+        # 7. agent_tools surface
+        agent_result = run(str(SCRIPTS / "agent_tools.py"), "selftest", check=False)
+        check("agent_tools selftest", agent_result.returncode == 0)
+
     print()
     if failures:
         print(f"{len(failures)} failure(s)", file=sys.stderr)

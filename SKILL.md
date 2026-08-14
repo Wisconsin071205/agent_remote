@@ -67,6 +67,9 @@ Four deterministic, offline-first tools sit under `scripts/` and follow `spec/wo
 | `slurm_adapter.py submit/query/history` | sbatch --parsable, squeue/sacct JSON with text fallback, normalized scheduler states | `selftest` runs 16 offline checks; scheduler state is never science state |
 | `workflow_prepare.py relax-static` | Generate 00_relax + 01_static trees, run.slurm, plan.json | Whitelisted INCAR keys, modification audit, idempotent, refuses to overwrite differing files, `--dry-run` |
 | `custodian_detect.py DIR` | Detect BRMIX/ZBRENT/EDDDAV/NELM/walltime/ZPOTRF failures | Never modifies files; `--propose` only writes a .proposed.patch preview |
+| `workflow_state.py init/status/advance DIR` | Explicit PREPARED→REVIEWED state machine with append-only audit | Illegal transitions rejected; FAILED/TIMEOUT/REJECTED are terminal |
+| `apply_patch.py DIR --patch P` | L2: apply an APPROVED patch to whitelisted files only | Backup + JSONL audit + `--dry-run`; non-whitelist targets rejected |
+| `agent_tools.py dispatch --name T --args JSON` | The only ten tools a central model may call | `schemas` prints OpenAI-format tool list; `selftest` runs offline |
 
 Prefer these over writing new shell scripts. Do not apply suggested patches without human approval (L1 detect / L2 propose only; L3 auto-apply whitelist is empty).
 
