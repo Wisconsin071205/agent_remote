@@ -36,7 +36,7 @@ SAFE_INCAR_KEYS = {
     "SYSTEM", "ENCUT", "EDIFF", "EDIFFG", "IBRION", "ISIF", "NSW", "ISMEAR",
     "SIGMA", "ISPIN", "NELM", "ALGO", "PREC", "LREAL", "LCHARG", "LWAVE",
     "IVDW", "GGA", "METAGGA", "ICHARG", "NEDOS", "EMIN", "EMAX", "LORBIT",
-    "NBANDS", "KSPACING", "EDIFFG_PER_ATOM", "LAECHG",
+    "NBANDS", "KSPACING", "EDIFFG_PER_ATOM", "LAECHG", "ISYM", "MAGMOM", "LASPH",
 }
 
 # INCAR key type mapping: str stays str, these convert to float/int/bool.
@@ -51,13 +51,16 @@ ERROR_SIGNATURES: list[tuple[str, str, str]] = [
     ("zbrent", r"ZBRENT", "ZBRENTVaspErrorHandler"),
     ("brmix", r"BRMIX", "BRMIXVaspErrorHandler"),
     ("edddav", r"EDDDAV|Error EDDDAV", "EddDavErrorHandler"),
-    ("nelm", r"WARNING in EDDRMM|NELM", "NELMVaspErrorHandler"),
+    ("nelm", r"WARNING in EDDRMM", "NELMVaspErrorHandler"),
     ("walltime", r"wall time|DUE TO TIME LIMIT", "WalltimeHandler"),
     ("zpotrf", r"LAPACK: Routine ZPOTRF|ZPOTRF", "ZpotrfVaspErrorHandler"),
     ("pssyevx", r"PSSYEVX", "PssyevxVaspErrorHandler"),
-    ("not_converged", r"reached required accuracy - stopping structural energy minimisation", ""),
+    ("zhegv", r"ZHEGV", "ZhegvVaspErrorHandler"),
     ("segfault", r"segmentation fault", ""),
 ]
+# Note: "reached required accuracy - stopping structural energy minimisation"
+# is deliberately NOT an error signature - it is VASP's NORMAL relaxation
+# termination marker, reported through ionic.converged instead.
 
 
 def file_sha256(path: Path) -> str:
@@ -97,16 +100,14 @@ def incar_key_params(values: dict[str, str]) -> dict[str, Any]:
         raw = values[key]
         if key in BOOL_KEYS:
             out[key.lower()] = raw.upper().startswith(("T", ".TRUE", "1"))
-        elif key in INT_KEYS:
-            try:
-                out[key.lower()] = int(float(raw))
-            except ValueError:
+        elif key in INT_KEYS or key in FLOAT_KEYS:
+            # Extract the leading number so trailing annotations such as
+            # "NSW = 100 (Max ionic steps)" still parse.
+            match = re.match(r"^\s*([-+0-9.eEdD]+)", raw)
+            if not match:
                 continue
-        elif key in FLOAT_KEYS:
-            try:
-                out[key.lower()] = float(raw)
-            except ValueError:
-                continue
+            value = float(match.group(1).replace("d", "e").replace("D", "E"))
+            out[key.lower()] = int(value) if key in INT_KEYS else value
         else:
             out[key.lower()] = raw
     return out
@@ -366,7 +367,9 @@ def main(argv: list[str] | None = None) -> int:
             r"reached required accuracy - stopping structural energy minimisation",
             outcar_raw))
         ionic_converged = reached and electronic_converged
-        ionic_criterion = "EDIFFG/EDIFF" if reached else ("NSW exhausted" if osz["ionic_steps"] >= int(incar_values.get("NSW", 0) or 0) else "")
+        nsw_match = re.match(r"^\s*([-+0-9.eEdD]+)", incar_values.get("NSW", "") or "")
+        nsw = int(float(nsw_match.group(1).replace("d", "e").replace("D", "E"))) if nsw_match else 0
+        ionic_criterion = "EDIFFG/EDIFF" if reached else ("NSW exhausted" if osz["ionic_steps"] >= nsw and nsw > 0 else "")
 
     if not outcar_raw:
         scientific_status = "not_started"

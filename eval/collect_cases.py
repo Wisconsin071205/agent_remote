@@ -122,7 +122,9 @@ def main(argv: list[str] | None = None) -> int:
     p_scan.add_argument("--out", default="", help="write the candidate list here (default stdout)")
 
     p_remote = sub.add_parser("collect-remote", help="pull de-identified samples through the gateway")
-    p_remote.add_argument("--server", default="")
+    p_remote.add_argument("--server", default="cl9")
+    p_remote.add_argument("--identity-file", default="~/.ssh/vlab-vm13926.pem",
+                          help="Vlab PEM key path (default: ~/.ssh/vlab-vm13926.pem)")
     p_remote.add_argument("--paths", required=True, help="file with one remote directory per line")
     p_remote.add_argument("--out", default="eval/cases")
     p_remote.add_argument("--dry-run", action="store_true")
@@ -158,6 +160,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.operation == "collect-remote":
+        import subprocess as sp
+
         paths = [line.strip() for line in Path(args.paths).read_text(encoding="utf-8").splitlines()
                  if line.strip() and not line.strip().startswith("#")]
         if not paths:
@@ -168,13 +172,66 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"would collect: {raw}")
             print(f"total {len(paths)} paths (dry-run, nothing downloaded)")
             return 0
-        print("collect-remote requires the gateway controller; downloading samples will be",
-              "implemented once the user approves server access for case collection.",
-              file=sys.stderr)
-        print("paths staged (no downloads yet):")
-        for raw in paths:
-            print("  " + raw)
-        return 1
+        identity = Path(args.identity_file).expanduser()
+        if not identity.is_file():
+            print(f"error: identity file missing: {identity}", file=sys.stderr)
+            return 2
+        controller = Path(__file__).resolve().parent.parent / "scripts" / "vasp-agent.ps1"
+        out_dir = Path(args.out)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ok_count = 0
+        for index, raw in enumerate(paths, start=1):
+            remote_dir = raw.rstrip("/")
+
+            def gateway(*operation_args: str) -> tuple[int, str]:
+                command = [
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                    "-File", str(controller), operation_args[0],
+                    "-ServerName", args.server,
+                    "-IdentityFile", str(identity),
+                ]
+                if len(operation_args) > 1:
+                    command += list(operation_args[1:])
+                result = sp.run(command, capture_output=True, timeout=180,
+                                encoding="utf-8", errors="replace")
+                return result.returncode, (result.stdout or "").strip()
+
+            code, inspect_out = gateway("vasp-inspect", "-RemotePath", remote_dir)
+            if code != 0:
+                print(f"skip [{remote_dir}]: vasp-inspect failed")
+                continue
+            try:
+                inspect = json.loads(inspect_out)
+            except json.JSONDecodeError:
+                print(f"skip [{remote_dir}]: vasp-inspect output is not JSON")
+                continue
+            if not inspect.get("files", {}).get("INCAR", {}).get("exists"):
+                print(f"skip [{remote_dir}]: no INCAR (not a calculation directory)")
+                continue
+            case_id = f"case-{index:02d}-{slug(remote_dir.rsplit('/', 1)[-1])}"
+            case_dir = out_dir / case_id
+            case_dir.mkdir(exist_ok=True)
+            (case_dir / "gateway-inspect.json").write_text(
+                json.dumps(inspect, ensure_ascii=False, indent=2), encoding="utf-8")
+            for name in ("INCAR", "POSCAR", "KPOINTS"):
+                code, content = gateway("read", "-RemotePath", remote_dir + "/" + name)
+                if code == 0 and content:
+                    (case_dir / name).write_text(content + chr(10), encoding="utf-8", newline=chr(10))
+            code, content = gateway("tail", "-RemotePath", remote_dir + "/OSZICAR", "-Lines", "500")
+            if code == 0 and content:
+                (case_dir / "OSZICAR").write_text(content + chr(10), encoding="utf-8", newline=chr(10))
+            code, content = gateway("tail", "-RemotePath", remote_dir + "/OUTCAR", "-Lines", "2000")
+            if code == 0 and content:
+                (case_dir / "OUTCAR").write_text(content + chr(10), encoding="utf-8", newline=chr(10))
+            titles = inspect.get("potcar_titles") or []
+            if titles:
+                (case_dir / "POTCAR.titles.txt").write_text(
+                    chr(10).join(titles) + chr(10), encoding="utf-8", newline=chr(10))
+            collected = sorted(p.name for p in case_dir.iterdir())
+            print(f"[{case_id}] <- {remote_dir} files={collected}")
+            ok_count += 1
+        print(f"collected {ok_count}/{len(paths)} paths into {out_dir}")
+        return 0 if ok_count else 1
 
     return 2
 

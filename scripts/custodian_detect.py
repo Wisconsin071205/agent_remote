@@ -65,7 +65,7 @@ BUILTIN_RULES: list[dict[str, Any]] = [
     },
     {
         "handler": "NELMVaspErrorHandler",
-        "pattern": r"WARNING in EDDRMM|NELM",
+        "pattern": r"WARNING in EDDRMM",
         "severity": "warning",
         "summary": "electronic steps hit NELM",
         "suggestion": "increase NELM, check ISMEAR/SIGMA adequacy, or restart from WAVECAR",
@@ -100,15 +100,18 @@ BUILTIN_RULES: list[dict[str, Any]] = [
         "evidence_limit": 3,
     },
     {
-        "handler": "PositiveEnergyErrorHandler",
-        "pattern": r"reached required accuracy - stopping structural energy minimisation",
-        "severity": "info",
-        "summary": "ionic relaxation reached its stopping criterion",
-        "suggestion": "none - this is normal termination of a relaxation",
-        "incar_changes": {},
-        "evidence_limit": 1,
+        "handler": "ZhegvVaspErrorHandler",
+        "pattern": r"ZHEGV",
+        "severity": "error",
+        "summary": "ZHEGV eigensolver fails",
+        "suggestion": "switch ALGO to Normal or check the basis set / parallel layout",
+        "incar_changes": {"ALGO": "Normal"},
+        "evidence_limit": 3,
     },
 ]
+# Note: "reached required accuracy - stopping structural energy minimisation"
+# is deliberately NOT a rule - it is VASP's NORMAL relaxation termination
+# marker (reported through vasp_parse's ionic.converged), not a failure.
 
 
 def read_tail(path: Path, limit: int = 8_000_000) -> str:

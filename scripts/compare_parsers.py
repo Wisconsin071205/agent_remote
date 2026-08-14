@@ -74,14 +74,44 @@ def compare_one(case_dir: Path, python_exe: str) -> dict[str, Any]:
     return record
 
 
+def _numeric(value: Any) -> float | None:
+    import re as _re
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    match = _re.match(r"^\s*([-+0-9.eEdD]+)", str(value))
+    if not match:
+        return None
+    try:
+        return float(match.group(1).replace("d", "e").replace("D", "E"))
+    except ValueError:
+        return None
+
+
+def _boolean(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().upper().split("(")[0].strip()
+    if text in (".TRUE.", ".T.", "TRUE", "T", "1", "YES"):
+        return True
+    if text in (".FALSE.", ".F.", "FALSE", "F", "0", "NO"):
+        return False
+    return None
+
+
 def equivalent(left: Any, right: Any) -> bool:
-    """Value equality tolerant of str-vs-number representations ('520' == 520.0)."""
+    """Value equality tolerant of str-vs-number ('520' == 520.0), trailing
+    annotations ('100 (Max ionic steps)' == 100) and boolean spellings."""
     if left == right:
         return True
-    try:
-        return float(left) == float(right)
-    except (TypeError, ValueError):
-        return False
+    left_bool, right_bool = _boolean(left), _boolean(right)
+    if left_bool is not None and right_bool is not None:
+        return left_bool == right_bool
+    left_num, right_num = _numeric(left), _numeric(right)
+    if left_num is not None and right_num is not None:
+        return left_num == right_num
+    return False
 
 
 def compare_with_gateway(manifest: dict[str, Any], gateway: dict[str, Any]) -> dict[str, Any]:
@@ -89,11 +119,13 @@ def compare_with_gateway(manifest: dict[str, Any], gateway: dict[str, Any]) -> d
     diffs: list[str] = []
     gw_files = gateway.get("files", {})
     my_files = manifest.get("results", {}).get("files", {})
-    for name in sorted(set(gw_files) | set(my_files)):
+    # Only report files the local parser has but the gateway does not.
+    # Gateway-only files are usually uncollected large outputs (CHGCAR,
+    # WAVECAR, ...) - a sampling difference, not a parsing difference.
+    for name in sorted(my_files):
         gw_exists = bool((gw_files.get(name) or {}).get("exists"))
-        my_exists = bool(my_files.get(name))
-        if gw_exists != my_exists:
-            diffs.append(f"files.{name}: gateway={gw_exists}, parser={my_exists}")
+        if not gw_exists:
+            diffs.append(f"files.{name}: gateway=False, parser=True")
     gw_incar = {k.lower(): v for k, v in (gateway.get("incar") or {}).items()}
     my_incar = manifest.get("inputs", {}).get("incar", {}).get("key_params", {})
     for key in sorted(set(gw_incar) | set(my_incar)):
