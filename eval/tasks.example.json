@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0",
+  "description": "示例任务集。真实评测任务将在 20 个脱敏历史案例收集后生成（eval/cases/），此处只演示格式。",
+  "tasks": [
+    {
+      "id": "healthy-static-01",
+      "title": "正常收敛的静态计算",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/healthy-static-01",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/healthy-static-01"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/healthy-static-01",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "encut": 520
+        },
+        "scientific_status": "electronic_converged"
+      }
+    },
+    {
+      "id": "relax-brmix-01",
+      "title": "BRMIX 失败后诊断并提议恢复",
+      "kind": "diagnose-recover",
+      "input_dir": "eval/cases/relax-brmix-01",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/relax-brmix-01"
+          }
+        },
+        {
+          "tool": "propose_recovery",
+          "args": {
+            "directory": "eval/cases/relax-brmix-01"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/relax-brmix-01",
+            "workflow": "relax"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [
+          "BRMIXVaspErrorHandler"
+        ],
+        "config": {
+          "encut": 520
+        }
+      }
+    },
+    {
+      "id": "static-nelm-01",
+      "title": "NELM 耗尽未收敛",
+      "kind": "diagnose-recover",
+      "input_dir": "eval/cases/static-nelm-01",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/static-nelm-01"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/static-nelm-01",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [
+          "NELMVaspErrorHandler"
+        ],
+        "config": {
+          "encut": 500
+        }
+      }
+    }
+  ]
+}
