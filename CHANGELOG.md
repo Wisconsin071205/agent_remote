@@ -4,6 +4,14 @@
 
 ## [未发布] — 确定性工作流内核（进行中）
 
+### 智能体接入与评测（第 5~6 周）
+- deepseek-agent.py 新增 `--deterministic` 模式：模型仅暴露 10 个高层工具
+  （无 Shell、无直接文件工具），提交强制 `approval_ref` 非空；
+  默认模式（21 个细粒度工具）保持向后兼容
+- eval/：三臂对照评测框架（A 人工脚本 / B 模型写脚本 / C 确定性工具+审批）——
+  统一 trace JSONL、七个指标（成功率/配置正确率/未授权写率/一致性/
+  诊断准确率/人工时间/成本）、C 臂离线可执行、determinism 双跑校验（6 项自检）
+
 ### 状态机与修复策略（第 3~4 周）
 - workflow_state.py：显式状态机 PREPARED→VALIDATED→APPROVED→SUBMITTED→RUNNING→
   FINISHED→PARSED→REVIEWED；合法转换表校验、附加审计历史、异常终态

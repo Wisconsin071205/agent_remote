@@ -38,7 +38,7 @@ Read [references/training.md](references/training.md) when collecting expert-rev
 
 ## Use DeepSeek
 
-Read the **Optional DeepSeek API** section in [references/setup.md](references/setup.md). Run `scripts/deepseek-agent.py`; it uses official function calling to expose only the same restricted operations. Keep the API key in `DEEPSEEK_API_KEY`, never in a file.
+Read the **Optional DeepSeek API** section in [references/setup.md](references/setup.md). Run `scripts/deepseek-agent.py`; it uses official function calling to expose only the same restricted operations. Keep the API key in `DEEPSEEK_API_KEY`, never in a file. Run it with `--deterministic` to restrict the model to the ten high-level workflow tools (no shell, no direct file tools, submission requires a non-empty approval reference).
 
 ## Use the visual interface
 
