@@ -738,6 +738,46 @@ def launch_connect_terminal(server_name: str) -> None:
     subprocess.Popen(command, creationflags=creationflags)
 
 
+def launch_manual_terminal(server_name: str) -> None:
+    """Open an interactive ssh window for the HUMAN operator.
+
+    This is the one place the UI hands the user a real terminal: a fresh
+    PowerShell console running ssh through the Vlab jump host straight to
+    the chosen server. The model has no access to this window and no tool
+    exists to read or send keys to it; the human types the password and
+    six-digit OTP there, exactly like the connect flow.
+    """
+    controller = STATE.controller()
+    entry = next((s for s in STATE.servers if s.get("name") == server_name), None)
+    if entry is None:
+        raise ValueError(f"服务器目录中没有 {server_name}")
+    target = str(entry.get("target", "")).strip()
+    if not target:
+        raise ValueError(f"服务器 {server_name} 没有目标地址")
+    port = int(entry.get("port", 22) or 22)
+    identity = controller.identity_file
+    jump = f"{controller.vlab_user}@{controller.vlab_host}"
+    ssh_command = (
+        "ssh -tt -i " + subprocess.list2cmdline([str(identity)]) +
+        " -o StrictHostKeyChecking=yes -o UpdateHostKeys=no" +
+        " -J " + subprocess.list2cmdline([jump]) +
+        " -p " + str(port) + " " + subprocess.list2cmdline([target])
+    )
+    banner = f"人工终端 - {server_name} ({target})"
+    ps_command = (
+        "Write-Host '" + banner + "' -ForegroundColor Cyan; "
+        "Write-Host '此窗口是您本人直接操作服务器的终端，智能体看不到也碰不到这里。' ; "
+        "Write-Host '按提示输入登录密码与六位验证码；退出后关闭本窗口。' ; "
+        "& " + ssh_command
+    )
+    command = [
+        "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass",
+        "-Command", ps_command,
+    ]
+    creationflags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+    subprocess.Popen(command, creationflags=creationflags)
+
+
 class Server(ThreadingHTTPServer):
     # Keep SO_REUSEADDR off: on Windows it lets a second VASPilot process
     # bind the same port, and two servers answering one URL make every POST
@@ -1204,6 +1244,19 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("尚未确定当前服务器，请先刷新服务器列表")
             launch_connect_terminal(name)
             self.json_response({"ok": True, "message": f"已为 {name} 打开 SSH 认证窗口"})
+            return
+        if path == "/api/terminal":
+            # Human-only interactive terminal: opens a separate console window;
+            # the model has no tool for this endpoint and never sees the window.
+            name = str(payload.get("name") or STATE.active_server or "").strip()
+            if not name:
+                raise ValueError("尚未确定当前服务器，请先刷新服务器列表")
+            if not any(s.get("name") == name for s in STATE.servers):
+                STATE.refresh_servers()
+            if not any(s.get("name") == name for s in STATE.servers):
+                raise ValueError(f"服务器目录中没有 {name}")
+            launch_manual_terminal(name)
+            self.json_response({"ok": True, "message": f"已为 {name} 打开人工终端窗口（仅限您本人操作）"})
             return
         if path == "/api/servers/select":
             name = str(payload.get("name", "")).strip()

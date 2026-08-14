@@ -440,6 +440,7 @@ function renderServers() {
           <div class="server-target">${escapeHtml(server.target)} · ${escapeHtml(server.root || "主目录")}</div>
         </div>
         <button class="row-edit" type="button" title="编辑属性" data-edit="${escapeHtml(server.name)}">✎</button>
+        <button class="row-terminal" type="button" title="打开人工终端（仅您本人操作，智能体不可见）" data-terminal="${escapeHtml(server.name)}">&gt;_</button>
         <button class="server-del" type="button" title="从目录中删除" data-remove="${escapeHtml(server.name)}">×</button>
       </div>`;
   }).join("");
@@ -452,6 +453,10 @@ function renderServers() {
   list.querySelectorAll(".server-del").forEach(button => button.addEventListener("click", event => {
     event.stopPropagation();
     removeServer(button.dataset.remove);
+  }));
+  list.querySelectorAll(".row-terminal").forEach(button => button.addEventListener("click", event => {
+    event.stopPropagation();
+    openManualTerminal(button.dataset.terminal);
   }));
   updateRoute();
 }
@@ -486,6 +491,16 @@ async function selectServer(name) {
     refreshServers();
   } catch (error) {
     toast(error.message);
+  }
+}
+
+async function openManualTerminal(name) {
+  try {
+    const data = await request("/api/terminal", { method: "POST", body: { name } });
+    toast(data.message || ("已为 " + name + " 打开人工终端窗口"));
+    addActivity("打开人工终端", name);
+  } catch (error) {
+    toast("打开终端失败：" + error.message);
   }
 }
 
