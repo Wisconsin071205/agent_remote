@@ -4,6 +4,18 @@
 
 ## [未发布] — 确定性工作流内核（进行中）
 
+### 案例工程与评测补全
+- eval/collect_cases.py：案例收集器——scan-local（扫描本地历史对话提取候选
+  远端目录）、mirror-local（本地目录脱敏镜像：POTCAR 只存 TITEL、OUTCAR 只留
+  尾部、OSZICAR 留尾 200 行）、collect-remote（远端收集骨架，dry-run 预览）
+- scripts/compare_parsers.py：批量解析器对比（vasp_parse vs gateway 正则），
+  数值等价判断（"520" == 520.0），输出逐案例对比矩阵与一致率汇总
+- eval/runner.py 补全：A 臂交互计时记录器（--auto 可测）、B 臂沙箱骨架、
+  C 臂真实模型 live 模式（DEEPSEEK_API_KEY 驱动、token 记账、无 key 优雅降级）
+- selftest 扩展到 10 项：三臂同格式 trace、未授权写率对比（A 0.0 / B 1.0 / C 0.0）、
+  对比表渲染
+- 安全：候选案例清单含真实远端路径，移出版本库并加入 .gitignore（脱敏后入库）
+
 ### 智能体接入与评测（第 5~6 周）
 - deepseek-agent.py 新增 `--deterministic` 模式：模型仅暴露 10 个高层工具
   （无 Shell、无直接文件工具），提交强制 `approval_ref` 非空；
