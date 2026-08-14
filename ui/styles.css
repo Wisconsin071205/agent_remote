@@ -85,7 +85,10 @@ button { color: inherit; }
 .mini-button { width: 21px; height: 21px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 6px; cursor: pointer; font-size: 13px; line-height: 1; display: grid; place-items: center; }
 .mini-button:hover { color: var(--accent); border-color: var(--accent-line); }
 .server-list { display: grid; gap: 4px; max-height: 230px; overflow-y: auto; }
-.server-row { display: grid; grid-template-columns: 8px 1fr auto auto; align-items: center; gap: 8px; padding: 8px; border-radius: 9px; border: 1px solid transparent; cursor: pointer; }
+.server-row { display: grid; grid-template-columns: 8px 1fr auto auto auto; align-items: center; gap: 8px; padding: 8px; border-radius: 9px; border: 1px solid transparent; cursor: pointer; }
+.row-terminal { border: 0; background: transparent; color: var(--muted-2); font: 10px var(--mono); padding: 2px 5px; cursor: pointer; opacity: 0; transition: opacity .12s; }
+.server-row:hover .row-terminal { opacity: 1; }
+.row-terminal:hover { color: var(--accent); background: var(--accent-soft); border-radius: 5px; }
 .server-row:hover { background: var(--panel-2); }
 .server-row.active { background: var(--accent-soft); border-color: var(--accent-line); }
 .server-row .status-dot { width: 7px; height: 7px; box-shadow: none; }
