@@ -57,6 +57,19 @@ Run `scripts/start-ui.ps1` to open the local VASPilot interface. Configure the V
 - Keep all remote file operations under the active server's `remote_root`; the gateway enforces containment per server and refuses copy/move/remove on the root itself.
 - When the UI shows multiple servers, the model acts only on the active server named in the per-turn server context; it has no tool to switch servers.
 
+## Deterministic workflow tools
+
+Four deterministic, offline-first tools sit under `scripts/` and follow `spec/workflows.md`:
+
+| Tool | Purpose | Safety property |
+|---|---|---|
+| `vasp_parse.py DIR` | Directory -> CalculationManifest JSON (hashes, energies, convergence, errors) | Deterministic: same directory parses byte-identically |
+| `slurm_adapter.py submit/query/history` | sbatch --parsable, squeue/sacct JSON with text fallback, normalized scheduler states | `selftest` runs 16 offline checks; scheduler state is never science state |
+| `workflow_prepare.py relax-static` | Generate 00_relax + 01_static trees, run.slurm, plan.json | Whitelisted INCAR keys, modification audit, idempotent, refuses to overwrite differing files, `--dry-run` |
+| `custodian_detect.py DIR` | Detect BRMIX/ZBRENT/EDDDAV/NELM/walltime/ZPOTRF failures | Never modifies files; `--propose` only writes a .proposed.patch preview |
+
+Prefer these over writing new shell scripts. Do not apply suggested patches without human approval (L1 detect / L2 propose only; L3 auto-apply whitelist is empty).
+
 ## Interpret results
 
 The controller returns the remote tool output and propagates failures. A disconnected master connection is expected after its persistence period; ask the user to run `connect -ServerName <name>` and complete password plus current six-digit OTP interactively.
