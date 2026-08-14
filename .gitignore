@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+scripts/_selftest_samples/
 
 # 日志（含测试产生的运行日志）
 *.log
