@@ -191,11 +191,27 @@ TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "remove_remote_path",
-            "description": "Permanently delete a remote file or directory, recursively for directories. Cannot be undone. Requires local approval.",
+            "description": "Move a remote file or directory into the server's timestamped quarantine area (.vaspilot-trash). Nothing is deleted; entries stay recoverable. Use purge_remote_path for permanent deletion. Requires local approval.",
             "parameters": {
                 "type": "object",
                 "properties": {"path": {"type": "string", "description": "Absolute remote path under the active server's allowed root"}},
                 "required": ["path"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "purge_remote_path",
+            "description": "Permanently delete an entry that already lives inside the quarantine area. Cannot be undone. The confirm_path must exactly match path. Requires local approval.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Absolute path inside the quarantine area (.vaspilot-trash)"},
+                    "confirm_path": {"type": "string", "description": "Must be typed again exactly as path; anything different is rejected"},
+                },
+                "required": ["path", "confirm_path"],
                 "additionalProperties": False,
             },
         },
@@ -416,9 +432,19 @@ def execute_tool(controller: Controller, name: str, arguments: dict[str, Any]) -
         path = arguments.get("path")
         if not isinstance(path, str) or not path:
             return {"ok": False, "error": "path is required"}
-        if not approve(f"Permanently delete {path}?"):
-            return {"ok": False, "denied": True, "error": "user denied deletion"}
+        if not approve(f"Move {path} into the quarantine area (recoverable)?"):
+            return {"ok": False, "denied": True, "error": "user denied quarantine move"}
         return controller.run("remove", "-RemotePath", path)
+    if name == "purge_remote_path":
+        path = arguments.get("path")
+        confirm_path = arguments.get("confirm_path")
+        if not isinstance(path, str) or not path:
+            return {"ok": False, "error": "path is required"}
+        if not isinstance(confirm_path, str) or confirm_path != path:
+            return {"ok": False, "error": "confirm_path must exactly match path"}
+        if not approve(f"PERMANENTLY delete {path}? This cannot be undone."):
+            return {"ok": False, "denied": True, "error": "user denied permanent deletion"}
+        return controller.run("purge", "-RemotePath", path, "-ConfirmPath", confirm_path)
     if name == "upload_file":
         local_path, remote_path = arguments.get("local_path"), arguments.get("remote_path")
         if not isinstance(local_path, str) or not isinstance(remote_path, str) or not local_path or not remote_path:

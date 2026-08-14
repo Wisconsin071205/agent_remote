@@ -50,6 +50,7 @@ RISKY_TOOLS = {
     "copy_remote_path",
     "move_remote_path",
     "remove_remote_path",
+    "purge_remote_path",
     "upload_file",
     "download_file",
     "transfer_remote_files",
@@ -349,7 +350,9 @@ def approval_summary(name: str, arguments: dict[str, Any]) -> tuple[str, str]:
     if name == "move_remote_path":
         return "移动远端文件", f"确认把远端 {arguments.get('source', '')} 移动到 {arguments.get('destination', '')} 吗？"
     if name == "remove_remote_path":
-        return "删除远端文件", f"确认永久删除远端 {arguments.get('path', '')} 吗？此操作不可恢复！"
+        return "移入隔离区", f"确认把远端 {arguments.get('path', '')} 移入隔离区吗？文件不会丢失，可用 purge 永久删除（需另行审批）。"
+    if name == "purge_remote_path":
+        return "永久删除（隔离区）", f"确认永久删除隔离区内的 {arguments.get('path', '')} 吗？此操作不可恢复！"
     if name == "upload_file":
         return "上传文件到远端", f"确认把本地 {arguments.get('local_path', '')} 上传到远端 {arguments.get('remote_path', '')} 吗？"
     if name == "download_file":
@@ -397,6 +400,14 @@ def execute_tool(controller: Any, name: str, arguments: dict[str, Any]) -> dict[
         if not isinstance(path, str) or not path:
             return {"ok": False, "error": "缺少路径"}
         return controller.run("remove", "-RemotePath", path)
+    if name == "purge_remote_path":
+        path = arguments.get("path")
+        confirm_path = arguments.get("confirm_path")
+        if not isinstance(path, str) or not path:
+            return {"ok": False, "error": "缺少路径"}
+        if not isinstance(confirm_path, str) or confirm_path != path:
+            return {"ok": False, "error": "确认路径必须与待删除路径完全一致"}
+        return controller.run("purge", "-RemotePath", path, "-ConfirmPath", confirm_path)
     if name == "upload_file":
         local_path, remote_path = arguments.get("local_path"), arguments.get("remote_path")
         if not isinstance(local_path, str) or not isinstance(remote_path, str) or not local_path or not remote_path:
