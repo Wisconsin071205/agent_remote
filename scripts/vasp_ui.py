@@ -738,15 +738,18 @@ def launch_connect_terminal(server_name: str) -> None:
     subprocess.Popen(command, creationflags=creationflags)
 
 
-def launch_manual_terminal(server_name: str) -> None:
-    """Open an interactive ssh window for the HUMAN operator.
+# ---------------------------------------------------------------------------
+# In-browser human terminal: each window gets its own ssh session behind a
+# random term_id. The model has no tool for these endpoints; the human types
+# the password and six-digit OTP in the browser window itself.
+# ---------------------------------------------------------------------------
+TERMINAL_SESSIONS: dict[str, dict[str, Any]] = {}
+TERMINAL_LOCK = threading.Lock()
+MAX_TERMINALS = 8
 
-    This is the one place the UI hands the user a real terminal: a fresh
-    PowerShell console running ssh through the Vlab jump host straight to
-    the chosen server. The model has no access to this window and no tool
-    exists to read or send keys to it; the human types the password and
-    six-digit OTP there, exactly like the connect flow.
-    """
+
+def launch_web_terminal(server_name: str) -> str:
+    """Spawn an interactive ssh pty and return its term_id."""
     controller = STATE.controller()
     entry = next((s for s in STATE.servers if s.get("name") == server_name), None)
     if entry is None:
@@ -755,27 +758,99 @@ def launch_manual_terminal(server_name: str) -> None:
     if not target:
         raise ValueError(f"服务器 {server_name} 没有目标地址")
     port = int(entry.get("port", 22) or 22)
-    identity = controller.identity_file
-    jump = f"{controller.vlab_user}@{controller.vlab_host}"
-    ssh_command = (
-        "ssh -tt -i " + subprocess.list2cmdline([str(identity)]) +
-        " -o StrictHostKeyChecking=yes -o UpdateHostKeys=no" +
-        " -J " + subprocess.list2cmdline([jump]) +
-        " -p " + str(port) + " " + subprocess.list2cmdline([target])
-    )
-    banner = f"人工终端 - {server_name} ({target})"
-    ps_command = (
-        "Write-Host '" + banner + "' -ForegroundColor Cyan; "
-        "Write-Host '此窗口是您本人直接操作服务器的终端，智能体看不到也碰不到这里。' ; "
-        "Write-Host '按提示输入登录密码与六位验证码；退出后关闭本窗口。' ; "
-        "& " + ssh_command
-    )
+    # Single hop to the Vlab gateway (PEM-authenticated), then the terminal
+    # auto-types the jump command once the shell is ready. ProxyCommand/-J
+    # share stdin with the child ssh on Windows and swallow the human's input.
     command = [
-        "powershell.exe", "-NoExit", "-ExecutionPolicy", "Bypass",
-        "-Command", ps_command,
+        "ssh", "-tt",
+        "-i", str(controller.identity_file),
+        "-o", "StrictHostKeyChecking=yes",
+        "-o", "UpdateHostKeys=no",
+        controller.vlab_user + "@" + controller.vlab_host,
     ]
-    creationflags = getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
-    subprocess.Popen(command, creationflags=creationflags)
+    jump_command = f"ssh -p {port} {target}\n"
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    proc = subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, encoding="utf-8", errors="replace", bufsize=0,
+        creationflags=creationflags,
+    )
+    with TERMINAL_LOCK:
+        # Drop finished sessions as a fallback when a window closed without
+        # /api/term/close (e.g. the browser tab was killed).
+        stale = [tid for tid, session in TERMINAL_SESSIONS.items()
+                 if session["proc"].poll() is not None]
+        for tid in stale:
+            TERMINAL_SESSIONS.pop(tid, None)
+        if len(TERMINAL_SESSIONS) >= MAX_TERMINALS:
+            raise ValueError(f"终端会话已达上限 {MAX_TERMINALS}，请先关闭不再使用的终端窗口")
+        term_id = secrets.token_hex(8)
+        session: dict[str, Any] = {"proc": proc, "output": [], "pos": 0,
+                                   "lock": threading.Lock(), "server": server_name}
+        TERMINAL_SESSIONS[term_id] = session
+
+    def reader() -> None:
+        stream = proc.stdout
+        try:
+            while True:
+                chunk = stream.read(1)
+                if chunk == "":
+                    break
+                with session["lock"]:
+                    session["output"].append(chunk)
+        except (ValueError, OSError):
+            pass
+
+    threading.Thread(target=reader, daemon=True).start()
+
+    # Auto-type the jump command once the Vlab shell is up (small delay so the
+    # line is not lost before bash attaches to the pty).
+    def autojump() -> None:
+        time.sleep(3.0)
+        if proc.poll() is None:
+            try:
+                proc.stdin.write(jump_command)
+                proc.stdin.flush()
+            except (OSError, ValueError):
+                pass
+
+    threading.Thread(target=autojump, daemon=True).start()
+    return term_id
+
+
+def term_read(term_id: str) -> dict[str, Any]:
+    session = TERMINAL_SESSIONS.get(term_id)
+    if session is None:
+        return {"ok": False, "error": "终端会话不存在或已关闭", "alive": False}
+    with session["lock"]:
+        data = "".join(session["output"][session["pos"]:])
+        session["pos"] = len(session["output"])
+    return {"ok": True, "data": data, "alive": session["proc"].poll() is None}
+
+
+def term_write(term_id: str, data: str) -> dict[str, Any]:
+    session = TERMINAL_SESSIONS.get(term_id)
+    if session is None:
+        return {"ok": False, "error": "终端会话不存在或已关闭"}
+    if session["proc"].poll() is not None:
+        return {"ok": False, "error": "终端会话已结束"}
+    try:
+        session["proc"].stdin.write(data)
+        session["proc"].stdin.flush()
+    except (OSError, ValueError) as exc:
+        return {"ok": False, "error": f"写入失败: {exc}"}
+    return {"ok": True}
+
+
+def term_close(term_id: str) -> dict[str, Any]:
+    session = TERMINAL_SESSIONS.pop(term_id, None)
+    if session is not None:
+        try:
+            session["proc"].terminate()
+        except OSError:
+            pass
+    return {"ok": True}
 
 
 class Server(ThreadingHTTPServer):
@@ -919,7 +994,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/":
             path = "/index.html"
         relative = path.lstrip("/")
-        if relative not in {"index.html", "app.js", "styles.css", "favicon.svg"}:
+        if relative not in {"index.html", "app.js", "styles.css", "favicon.svg", "terminal.html"}:
             self.send_error(404)
             return
         file_path = UI_DIR / relative
@@ -1246,8 +1321,9 @@ class Handler(BaseHTTPRequestHandler):
             self.json_response({"ok": True, "message": f"已为 {name} 打开 SSH 认证窗口"})
             return
         if path == "/api/terminal":
-            # Human-only interactive terminal: opens a separate console window;
-            # the model has no tool for this endpoint and never sees the window.
+            # Web terminal for the HUMAN operator: opens an in-browser terminal
+            # window (window.open from the UI). The model has no tool for these
+            # endpoints and never sees the session contents.
             name = str(payload.get("name") or STATE.active_server or "").strip()
             if not name:
                 raise ValueError("尚未确定当前服务器，请先刷新服务器列表")
@@ -1255,8 +1331,24 @@ class Handler(BaseHTTPRequestHandler):
                 STATE.refresh_servers()
             if not any(s.get("name") == name for s in STATE.servers):
                 raise ValueError(f"服务器目录中没有 {name}")
-            launch_manual_terminal(name)
-            self.json_response({"ok": True, "message": f"已为 {name} 打开人工终端窗口（仅限您本人操作）"})
+            term_id = launch_web_terminal(name)
+            self.json_response({"ok": True, "term_id": term_id,
+                                "message": f"已为 {name} 打开网页终端（仅限您本人操作）"})
+            return
+        if path == "/api/term/output":
+            term_id = str(payload.get("term_id") or "").strip()
+            self.json_response(term_read(term_id))
+            return
+        if path == "/api/term/input":
+            term_id = str(payload.get("term_id") or "").strip()
+            data = str(payload.get("data") or "")
+            if len(data) > 16384:
+                raise ValueError("单次输入过长")
+            self.json_response(term_write(term_id, data))
+            return
+        if path == "/api/term/close":
+            term_id = str(payload.get("term_id") or "").strip()
+            self.json_response(term_close(term_id))
             return
         if path == "/api/servers/select":
             name = str(payload.get("name", "")).strip()

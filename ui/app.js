@@ -494,14 +494,12 @@ async function selectServer(name) {
   }
 }
 
-async function openManualTerminal(name) {
-  try {
-    const data = await request("/api/terminal", { method: "POST", body: { name } });
-    toast(data.message || ("已为 " + name + " 打开人工终端窗口"));
-    addActivity("打开人工终端", name);
-  } catch (error) {
-    toast("打开终端失败：" + error.message);
-  }
+function openManualTerminal(name) {
+  // Open the in-browser human terminal in a NEW window so the main UI keeps
+  // running untouched; every terminal window gets its own session.
+  const url = "/terminal.html?server=" + encodeURIComponent(name);
+  window.open(url, "_blank");
+  addActivity("打开人工终端", name);
 }
 
 async function addServer(payload) {
