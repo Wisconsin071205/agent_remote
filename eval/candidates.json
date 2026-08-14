@@ -1,0 +1,295 @@
+[
+  {
+    "path": "/public/home/user",
+    "mentions": 37,
+    "examples": [
+      "60Ryj0tCCJI.json",
+      "60Ryj0tCCJI.json",
+      "60Ryj0tCCJI.json"
+    ]
+  },
+  {
+    "path": "/public/home/user2",
+    "mentions": 20,
+    "examples": [
+      "60Ryj0tCCJI.json",
+      "60Ryj0tCCJI.json",
+      "60Ryj0tCCJI.json"
+    ]
+  },
+  {
+    "path": "/public/home/user/llm_test/NaOH_opt",
+    "mentions": 19,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json"
+    ]
+  },
+  {
+    "path": "/public/home/user.",
+    "mentions": 12,
+    "examples": [
+      "60Ryj0tCCJI.json",
+      "60Ryj0tCCJI.json",
+      "60Ryj0tCCJI.json"
+    ]
+  },
+  {
+    "path": "/public/home/user2.",
+    "mentions": 8,
+    "examples": [
+      "60Ryj0tCCJI.json",
+      "60Ryj0tCCJI.json",
+      "60Ryj0tCCJI.json"
+    ]
+  },
+  {
+    "path": "/public/home/user/llm_test/NoOH",
+    "mentions": 5,
+    "examples": [
+      "OaXp160JQSw.json",
+      "OaXp160JQSw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/public/home/user/llm_test/",
+    "mentions": 5,
+    "examples": [
+      "OaXp160JQSw.json",
+      "OaXp160JQSw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/public/home/user/llm_test",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/opt/Modules/mpi",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/opt/Modules/app",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/opt/Modules/python",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/opt/Modules/compiler",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/opt/Modules/lib",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/double/2.1.5/2015.update6",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/double/2.1.5/2017.update8",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/double/3.3.8/2015.update6",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/double/3.3.8/2017.update8",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/double/3.3.8/2019.update",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/float/2.1.5/2015.update6",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/float/2.1.5/2017.update8",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/float/3.3.8/2015.update6",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/float/3.3.8/2017.update8",
+    "mentions": 4,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/POSCAR/POTCAR/KPOINTS",
+    "mentions": 3,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json",
+      "6x2m2NJ7QRw.json"
+    ]
+  },
+  {
+    "path": "/public/home/user2/llm_test",
+    "mentions": 2,
+    "examples": [
+      "60Ryj0tCCJI.json",
+      "60Ryj0tCCJI.json"
+    ]
+  },
+  {
+    "path": "/public/software/modules",
+    "mentions": 2,
+    "examples": [
+      "6x2m2NJ7QRw.json",
+      "OaXp160JQSw.json"
+    ]
+  },
+  {
+    "path": "/public/home/user/llm_test/NaOH",
+    "mentions": 1,
+    "examples": [
+      "60Ryj0tCCJI.json"
+    ]
+  },
+  {
+    "path": "/public/home/user2/llm_test/",
+    "mentions": 1,
+    "examples": [
+      "60Ryj0tCCJI.json"
+    ]
+  },
+  {
+    "path": "/public/home/user/llmtest.",
+    "mentions": 1,
+    "examples": [
+      "6x2m2NJ7QRw.json"
+    ]
+  },
+  {
+    "path": "/public/home/user/llm_test/NaOH_opt/INCAR",
+    "mentions": 1,
+    "examples": [
+      "6x2m2NJ7QRw.json"
+    ]
+  },
+  {
+    "path": "/public/home/user/llm_test/NaOH_opt/POSCAR",
+    "mentions": 1,
+    "examples": [
+      "6x2m2NJ7QRw.json"
+    ]
+  },
+  {
+    "path": "/public/home/user/llm_test/NaOH_opt/KPOINTS",
+    "mentions": 1,
+    "examples": [
+      "6x2m2NJ7QRw.json"
+    ]
+  },
+  {
+    "path": "/public/home/user/llm_test/NaOH_opt/vasp.pbs",
+    "mentions": 1,
+    "examples": [
+      "6x2m2NJ7QRw.json"
+    ]
+  },
+  {
+    "path": "/public/home/user/llm_test/NaOH_opt/mpi.sh_",
+    "mentions": 1,
+    "examples": [
+      "6x2m2NJ7QRw.json"
+    ]
+  },
+  {
+    "path": "/6/8/12/24",
+    "mentions": 1,
+    "examples": [
+      "6x2m2NJ7QRw.json"
+    ]
+  },
+  {
+    "path": "/6/8/12.",
+    "mentions": 1,
+    "examples": [
+      "6x2m2NJ7QRw.json"
+    ]
+  }
+]
