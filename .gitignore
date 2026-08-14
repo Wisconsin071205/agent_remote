@@ -12,6 +12,10 @@ scripts/_selftest_samples/
 # （轮换凭据并重新生成脱敏版本后才可移除此条目）
 conversation-export.html
 
+# 案例候选清单含真实远端路径（个人识别信息），仅保留本地供审阅
+eval/candidates.json
+eval/cases/
+
 # 本地编辑器与系统文件
 .vscode/
 .idea/
