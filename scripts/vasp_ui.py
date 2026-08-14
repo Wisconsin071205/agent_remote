@@ -758,17 +758,20 @@ def launch_web_terminal(server_name: str) -> str:
     if not target:
         raise ValueError(f"服务器 {server_name} 没有目标地址")
     port = int(entry.get("port", 22) or 22)
-    # Single hop to the Vlab gateway (PEM-authenticated), then the terminal
-    # auto-types the jump command once the shell is ready. ProxyCommand/-J
-    # share stdin with the child ssh on Windows and swallow the human's input.
+    # Single hop to the Vlab gateway, with the inner ssh to the target server
+    # passed as the REMOTE COMMAND: no Vlab MOTD, no bash startup, the target's
+    # password prompt appears immediately (same pattern as gateway connect).
+    # ProxyCommand/-J are avoided because they share stdin with the child ssh
+    # on Windows and swallow the human's input.
+    remote_command = f"ssh -tt -p {port} {target}"
     command = [
         "ssh", "-tt",
         "-i", str(controller.identity_file),
         "-o", "StrictHostKeyChecking=yes",
         "-o", "UpdateHostKeys=no",
         controller.vlab_user + "@" + controller.vlab_host,
+        remote_command,
     ]
-    jump_command = f"ssh -p {port} {target}\n"
     creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     proc = subprocess.Popen(
         command,
@@ -803,19 +806,6 @@ def launch_web_terminal(server_name: str) -> str:
             pass
 
     threading.Thread(target=reader, daemon=True).start()
-
-    # Auto-type the jump command once the Vlab shell is up (small delay so the
-    # line is not lost before bash attaches to the pty).
-    def autojump() -> None:
-        time.sleep(3.0)
-        if proc.poll() is None:
-            try:
-                proc.stdin.write(jump_command)
-                proc.stdin.flush()
-            except (OSError, ValueError):
-                pass
-
-    threading.Thread(target=autojump, daemon=True).start()
     return term_id
 
 
