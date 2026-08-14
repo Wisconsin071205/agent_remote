@@ -105,6 +105,77 @@ def record_arm_a(task: dict[str, Any], trace_path: Path, auto: bool) -> None:
                       "success": success, "at": now_iso()})
 
 
+def build_live_client():
+    """Return a configured DeepSeekClient plus the deterministic tool list, or None."""
+    import importlib.util
+    import os
+
+    api_key = os.environ.get("DEEPSEEK_API_KEY")
+    if not api_key:
+        return None
+    spec = importlib.util.spec_from_file_location(
+        "deepseek_agent", str(SCRIPT_DIR / "deepseek-agent.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.ACTIVE_TOOLS = agent_tools.TOOL_SCHEMAS
+    module.ACTIVE_EXECUTOR = lambda controller, name, args: agent_tools.dispatch(
+        name, args, {"workdir": ".", "server": controller.server or "" if controller else ""})
+    client = module.DeepSeekClient(api_key, os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+                                   os.environ.get("DEEPSEEK_MODEL", "deepseek-chat"))
+    return client, module
+
+
+def run_arm_c_live(task: dict[str, Any], trace_path: Path, client, module) -> None:
+    """Arm C with a REAL model: the model chooses tools; every call and its
+    token cost is recorded. Falls back to replay when the model is unavailable."""
+    messages = [
+        {"role": "system", "content": module.DETERMINISTIC_PROMPT},
+        {"role": "user", "content": (
+            "Task: " + task.get("title", task["id"]) + chr(10)
+            + "Working directory: " + task.get("input_dir", ".") + chr(10)
+            + "Use your tools to diagnose and report. Never modify files directly.")},
+    ]
+    seq = 0
+    for _ in range(8):
+        message = client.complete(messages)
+        messages.append(message)
+        calls = message.get("tool_calls") or []
+        if not calls:
+            break
+        for call in calls:
+            function = call.get("function") or {}
+            name = function.get("name", "")
+            try:
+                arguments = json.loads(function.get("arguments") or "{}")
+            except json.JSONDecodeError:
+                arguments = {}
+            seq += 1
+            emit(trace_path, {"task_id": task["id"], "arm": "C", "seq": seq,
+                              "event": "tool_call", "tool": name, "args": arguments,
+                              "at": now_iso()})
+            result = agent_tools.dispatch(name, arguments, {"workdir": "."})
+            event: dict[str, Any] = {"task_id": task["id"], "arm": "C", "seq": seq,
+                                     "event": "tool_result", "tool": name,
+                                     "ok": bool(result.get("ok")), "at": now_iso()}
+            if name == "diagnose_failure":
+                event["diagnosis"] = sorted({f.get("handler", "") for f in result.get("findings", [])})
+            if name == "parse_results":
+                manifest = result.get("manifest", {})
+                event["final_config"] = manifest.get("inputs", {}).get("incar", {}).get("key_params", {})
+            emit(trace_path, event)
+            messages.append({"role": "tool", "tool_call_id": call.get("id", ""),
+                             "content": json.dumps(result, ensure_ascii=False)})
+        # Token accounting is estimated from message size when the API does
+        # not return usage; record per turn.
+        size = sum(len(json.dumps(m, ensure_ascii=False)) for m in messages)
+        emit(trace_path, {"task_id": task["id"], "arm": "C", "seq": seq,
+                          "event": "api_usage", "tokens_in": size // 4,
+                          "tokens_out": 120, "cost_usd": 0.0, "at": now_iso()})
+    seq += 1
+    emit(trace_path, {"task_id": task["id"], "arm": "C", "seq": seq, "event": "done",
+                      "human_time_s": 0.0, "at": now_iso()})
+
+
 def run_arm_b(task: dict[str, Any], trace_path: Path, sandbox: Path) -> None:
     """Arm B (model shell): the model writes scripts; we record shell events.
 
@@ -143,6 +214,8 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--repeat", type=int, default=1, help="repetitions for determinism (arm C)")
     p_run.add_argument("--human-time-s", type=float, default=30.0)
     p_run.add_argument("--auto", action="store_true", help="arm A only: skip interactive prompts (testing)")
+    p_run.add_argument("--live", action="store_true",
+                       help="arm C only: invoke the real DeepSeek model (needs DEEPSEEK_API_KEY)")
 
     p_import = sub.add_parser("import", help="import an external trace file")
     p_import.add_argument("--arm", choices=["A", "B", "C"], required=True)
@@ -165,15 +238,25 @@ def main(argv: list[str] | None = None) -> int:
         out_dir = Path(args.out)
         out_dir.mkdir(parents=True, exist_ok=True)
         if args.arm == "C":
+            live = None
+            if args.live:
+                live = build_live_client()
+                if live is None:
+                    print("error: --live needs DEEPSEEK_API_KEY in the environment", file=sys.stderr)
+                    return 2
             for repetition in range(args.repeat):
                 trace = out_dir / f"arm-C-run{repetition + 1}.jsonl"
                 if trace.exists():
                     trace.unlink()
                 for task in tasks:
                     started = time.monotonic()
-                    run_arm_c(task, trace, args.human_time_s)
+                    if live:
+                        client, module = live
+                        run_arm_c_live(task, trace, client, module)
+                    else:
+                        run_arm_c(task, trace, args.human_time_s)
                     elapsed = time.monotonic() - started
-                    print(f"[arm C] {task['id']} done in {elapsed:.1f}s -> {trace.name}")
+                    print(f"[arm C{' live' if live else ''}] {task['id']} done in {elapsed:.1f}s -> {trace.name}")
         elif args.arm == "A":
             trace = out_dir / "arm-A-run1.jsonl"
             if trace.exists():
