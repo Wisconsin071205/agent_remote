@@ -477,12 +477,62 @@ def do_move(args: argparse.Namespace) -> int:
     return result.returncode
 
 
+TRASH_DIR_NAME = ".vaspilot-trash"
+
+
+def trash_root_for(name: str, entry: dict) -> str:
+    """Quarantine area living directly under the server allowed root."""
+    return str(effective_root(name, entry) / TRASH_DIR_NAME)
+
+
 def do_remove(args: argparse.Namespace) -> int:
+    """Move a remote path into the timestamped quarantine area (recoverable).
+
+    Nothing is deleted here; permanent deletion is a separate "purge"
+    command that only accepts paths already inside the quarantine area.
+    """
     name, entry = resolve_server(args.server)
     path = validated_remote_path(args.path, entry, name)
     require_not_root(path, entry)
+    trash_root = trash_root_for(name, entry)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+    destination = f"{trash_root}/{stamp}_{PurePosixPath(path).name}"
+    command = f"mkdir -p -- {shlex.quote(trash_root)} && mv -- {shlex.quote(path)} {shlex.quote(destination)}"
+    result = remote(name, command)
+    audit("trash", "ok" if result.returncode == 0 else "failed", f"{path} -> {destination}", name)
+    if result.returncode == 0:
+        print(f"moved to quarantine: {destination}")
+        print("permanent deletion requires a separate purge command")
+    return result.returncode
+
+
+def do_purge(args: argparse.Namespace) -> int:
+    """Permanently delete an entry that already lives inside the quarantine area.
+
+    Requires the path to be typed twice (path + confirm_path) and rejects
+    anything outside the quarantine area, including the area itself.
+    """
+    name, entry = resolve_server(args.server)
+    path = validated_remote_path(args.path, entry, name)
+    if args.confirm_path != args.path:
+        raise ValueError("confirmation path must exactly match the requested path")
+    trash_root = PurePosixPath(trash_root_for(name, entry))
+    target = PurePosixPath(path)
+    if target == trash_root or trash_root not in target.parents:
+        raise ValueError("purge only accepts paths inside the quarantine area")
     result = remote(name, f"rm -r -- {shlex.quote(path)}")
-    audit("remove", "ok" if result.returncode == 0 else "failed", path, name)
+    audit("purge", "ok" if result.returncode == 0 else "failed", path, name)
+    if result.returncode == 0:
+        print(f"permanently deleted: {path}")
+    return result.returncode
+
+
+def do_trash_list(args: argparse.Namespace) -> int:
+    """List everything currently held in the quarantine area."""
+    name, entry = resolve_server(args.server)
+    trash_root = trash_root_for(name, entry)
+    result = remote(name, f"ls -la -- {shlex.quote(trash_root)}")
+    audit("trash-list", "ok" if result.returncode == 0 else "failed", trash_root, name)
     return result.returncode
 
 
@@ -816,6 +866,12 @@ def parser() -> argparse.ArgumentParser:
     remove_op = sub.add_parser("remove", parents=[server])
     remove_op.add_argument("path")
     remove_op.set_defaults(handler=do_remove)
+    purge = sub.add_parser("purge", parents=[server])
+    purge.add_argument("path")
+    purge.add_argument("confirm_path")
+    purge.set_defaults(handler=do_purge)
+    trash_list = sub.add_parser("trash-list", parents=[server])
+    trash_list.set_defaults(handler=do_trash_list)
     submit = sub.add_parser("submit", parents=[server])
     submit.add_argument("directory")
     submit.add_argument("script")
