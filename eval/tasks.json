@@ -1,0 +1,435 @@
+{
+  "schema_version": "1.0",
+  "tasks": [
+    {
+      "id": "case-01-az",
+      "title": "case-01-az",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-01-az",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-01-az"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-01-az",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "ibrion": 2,
+          "isif": 3,
+          "nsw": 100
+        },
+        "scientific_status": "running"
+      }
+    },
+    {
+      "id": "case-02-ca",
+      "title": "case-02-ca",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-02-ca",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-02-ca"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-02-ca",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [
+          "EddDavErrorHandler",
+          "ZhegvVaspErrorHandler"
+        ],
+        "config": {
+          "ibrion": 2,
+          "isif": 3,
+          "nsw": 100
+        },
+        "scientific_status": "failed"
+      }
+    },
+    {
+      "id": "case-03-0528",
+      "title": "case-03-0528",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-03-0528",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-03-0528"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-03-0528",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "encut": 400.0,
+          "ibrion": 2,
+          "isif": 3,
+          "nsw": 300
+        },
+        "scientific_status": "not_started"
+      }
+    },
+    {
+      "id": "case-04-Au",
+      "title": "case-04-Au",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-04-Au",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-04-Au"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-04-Au",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "encut": 400.0,
+          "ibrion": -1,
+          "isif": 2,
+          "nsw": 100
+        },
+        "scientific_status": "ionic_converged"
+      }
+    },
+    {
+      "id": "case-05-Cu",
+      "title": "case-05-Cu",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-05-Cu",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-05-Cu"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-05-Cu",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "encut": 400.0,
+          "ibrion": -1,
+          "isif": 2,
+          "nsw": 0
+        },
+        "scientific_status": "ionic_converged"
+      }
+    },
+    {
+      "id": "case-06-Pb",
+      "title": "case-06-Pb",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-06-Pb",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-06-Pb"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-06-Pb",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "encut": 400.0,
+          "ibrion": -1,
+          "isif": 2,
+          "nsw": 100
+        },
+        "scientific_status": "ionic_converged"
+      }
+    },
+    {
+      "id": "case-07-Si",
+      "title": "case-07-Si",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-07-Si",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-07-Si"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-07-Si",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "encut": 400.0,
+          "ibrion": -1,
+          "isif": 2,
+          "nsw": 50
+        },
+        "scientific_status": "ionic_converged"
+      }
+    },
+    {
+      "id": "case-08-go",
+      "title": "case-08-go",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-08-go",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-08-go"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-08-go",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "encut": 450.0,
+          "ibrion": 2,
+          "isif": 2,
+          "nsw": 100
+        },
+        "scientific_status": "not_started"
+      }
+    },
+    {
+      "id": "case-09-OH",
+      "title": "case-09-OH",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-09-OH",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-09-OH"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-09-OH",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "encut": 400.0,
+          "ibrion": 2,
+          "isif": 2,
+          "nsw": 300
+        },
+        "scientific_status": "ionic_converged"
+      }
+    },
+    {
+      "id": "case-10-go",
+      "title": "case-10-go",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-10-go",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-10-go"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-10-go",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "encut": 450.0,
+          "ibrion": 2,
+          "isif": 2,
+          "nsw": 100
+        },
+        "scientific_status": "not_started"
+      }
+    },
+    {
+      "id": "case-11-pwx",
+      "title": "case-11-pwx",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-11-pwx",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-11-pwx"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-11-pwx",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "encut": 400.0
+        },
+        "scientific_status": "electronic_converged"
+      }
+    },
+    {
+      "id": "case-12-qe",
+      "title": "case-12-qe",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-12-qe",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-12-qe"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-12-qe",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "ibrion": 2,
+          "isif": 2,
+          "nsw": 100
+        },
+        "scientific_status": "ionic_converged"
+      }
+    },
+    {
+      "id": "case-13-wew",
+      "title": "case-13-wew",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-13-wew",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-13-wew"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-13-wew",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "ibrion": 2,
+          "isif": 2,
+          "nsw": 100
+        },
+        "scientific_status": "ionic_converged"
+      }
+    },
+    {
+      "id": "case-14-NaOH_opt",
+      "title": "case-14-NaOH_opt",
+      "kind": "diagnose",
+      "input_dir": "eval/cases/case-14-NaOH_opt",
+      "steps": [
+        {
+          "tool": "diagnose_failure",
+          "args": {
+            "directory": "eval/cases/case-14-NaOH_opt"
+          }
+        },
+        {
+          "tool": "parse_results",
+          "args": {
+            "directory": "eval/cases/case-14-NaOH_opt",
+            "workflow": "static"
+          }
+        }
+      ],
+      "expect": {
+        "diagnosis": [],
+        "config": {
+          "encut": 400.0,
+          "ibrion": 2,
+          "isif": 2,
+          "nsw": 200
+        },
+        "scientific_status": "not_started"
+      }
+    }
+  ]
+}

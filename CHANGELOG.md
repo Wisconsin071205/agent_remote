@@ -4,6 +4,21 @@
 
 ## [未发布] — 确定性工作流内核（进行中）
 
+### 真实案例收集与解析器对齐（14 案例）
+- 从 cl9 真实历史数据收集 14 个脱敏案例（eval/cases/，不入库）：7 个离子收敛、
+  2 个失败（EDDDAV+ZHEGV、NELM）、1 个运行中、4 个未启动
+- 逐案例比较 vasp_parse（pymatgen 增强）与 gateway 正则解析器，**14/14 全部一致**；
+  过程中修复 4 类真实问题：
+  1. INCAR 括号注释（"NSW = 100 (Max ionic steps)"）导致解析崩溃 → 数值提取
+  2. parser 缺 zhegv 签名与 ISYM/MAGMOM/LASPH 白名单键
+  3. gateway 白名单缺 LORBIT/ICHARG/EMIN/EMAX/LAECHG/NEDOS，错误检测缺 nelm
+     （已重新部署到 Vlab）
+  4. NELM 误报（参数回显行被当错误）与"收敛标志误当错误"的语义 bug
+- 14 案例确定性双跑全部逐字节一致；C 臂评测全部指标达标：
+  成功率 1.0 / 配置正确率 1.0 / 未授权写 0.0 / 一致性 1.0 / 诊断准确率 1.0
+- eval/collect_cases.py 的 collect-remote 落地为真实下载（vasp-inspect + read + tail，
+  POTCAR 只存 TITEL）
+
 ### 案例工程与评测补全
 - eval/collect_cases.py：案例收集器——scan-local（扫描本地历史对话提取候选
   远端目录）、mirror-local（本地目录脱敏镜像：POTCAR 只存 TITEL、OUTCAR 只留

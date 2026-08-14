@@ -88,7 +88,7 @@ for name in standard:
 
 incar_raw = text("INCAR", 500_000)
 incar = incar_values(incar_raw)
-safe_incar_keys = ["SYSTEM", "ENCUT", "EDIFF", "EDIFFG", "IBRION", "ISIF", "NSW", "ISMEAR", "SIGMA", "ISPIN", "MAGMOM", "LREAL", "PREC", "ALGO", "NELM", "ISYM", "LCHARG", "LWAVE", "LASPH", "LDAU", "IVDW", "GGA", "METAGGA"]
+safe_incar_keys = ["SYSTEM", "ENCUT", "EDIFF", "EDIFFG", "IBRION", "ISIF", "NSW", "ISMEAR", "SIGMA", "ISPIN", "MAGMOM", "LREAL", "PREC", "ALGO", "NELM", "ISYM", "LCHARG", "LWAVE", "LASPH", "LDAU", "IVDW", "GGA", "METAGGA", "LORBIT", "ICHARG", "EMIN", "EMAX", "LAECHG", "NEDOS"]
 result["incar"] = {key: incar[key] for key in safe_incar_keys if key in incar}
 
 for required in ["INCAR", "POSCAR", "POTCAR"]:
@@ -160,7 +160,8 @@ if electronic:
 patterns = {
     "zbrent": r"ZBRENT:", "brmix": r"BRMIX:", "edddav": r"EDDDAV:", "zhegv": r"ZHEGV",
     "posmap": r"POSMAP", "very_bad_news": r"VERY BAD NEWS", "internal_error": r"internal error",
-    "subspace_rotation": r"Sub-Space-Matrix is not hermitian", "charge_mismatch": r"inconsistent charge density"
+    "subspace_rotation": r"Sub-Space-Matrix is not hermitian", "charge_mismatch": r"inconsistent charge density",
+    "nelm": r"WARNING in EDDRMM",
 }
 errors = []
 combined = outcar + "\n" + oszicar

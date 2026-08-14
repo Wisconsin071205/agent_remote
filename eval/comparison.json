@@ -1,0 +1,207 @@
+{
+  "total_cases": 14,
+  "parse_ok": 14,
+  "compared_with_gateway": 14,
+  "gateway_agreement": 14,
+  "records": [
+    {
+      "case": "case-01-az",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "running",
+      "errors": [],
+      "e0_ev": -17.850226,
+      "n_atoms": 5,
+      "formula": "H4C",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-02-ca",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "failed",
+      "errors": [
+        "edddav",
+        "zhegv"
+      ],
+      "e0_ev": 4015.5727,
+      "n_atoms": 40,
+      "formula": "Pt9C",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-03-0528",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "not_started",
+      "errors": [],
+      "e0_ev": null,
+      "n_atoms": 2,
+      "formula": "C",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-04-Au",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "ionic_converged",
+      "errors": [],
+      "e0_ev": -13.920616,
+      "n_atoms": 1,
+      "formula": "Au",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-05-Cu",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "ionic_converged",
+      "errors": [],
+      "e0_ev": -13.526513,
+      "n_atoms": 1,
+      "formula": "Cu",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-06-Pb",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "ionic_converged",
+      "errors": [],
+      "e0_ev": 7.6489678,
+      "n_atoms": 1,
+      "formula": "Pb",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-07-Si",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "ionic_converged",
+      "errors": [],
+      "e0_ev": 6.160095,
+      "n_atoms": 2,
+      "formula": "Si",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-08-go",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "not_started",
+      "errors": [],
+      "e0_ev": null,
+      "n_atoms": null,
+      "formula": null,
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-09-OH",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "ionic_converged",
+      "errors": [],
+      "e0_ev": -9.7415362,
+      "n_atoms": 2,
+      "formula": "H2O2",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-10-go",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "not_started",
+      "errors": [],
+      "e0_ev": null,
+      "n_atoms": null,
+      "formula": null,
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-11-pwx",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "electronic_converged",
+      "errors": [],
+      "e0_ev": -13.313165,
+      "n_atoms": 3,
+      "formula": "H2O",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-12-qe",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "ionic_converged",
+      "errors": [],
+      "e0_ev": -18.153099,
+      "n_atoms": 4,
+      "formula": "H2O2",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-13-wew",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "ionic_converged",
+      "errors": [],
+      "e0_ev": -18.153099,
+      "n_atoms": 4,
+      "formula": "H2O2",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    },
+    {
+      "case": "case-14-NaOH_opt",
+      "parse_ok": true,
+      "parser": "pymatgen",
+      "scientific_status": "not_started",
+      "errors": [],
+      "e0_ev": null,
+      "n_atoms": 3,
+      "formula": "NaHO",
+      "gateway_compare": {
+        "equal": true,
+        "differences": []
+      }
+    }
+  ]
+}
