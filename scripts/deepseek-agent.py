@@ -27,6 +27,16 @@ Distinguish program completion, electronic convergence, and ionic convergence.
 Explain a proposed submission or cancellation before calling it.
 Keep answers concise and reply in the user's language."""
 
+DETERMINISTIC_PROMPT = """You are a VASP workflow orchestrator operating a deterministic tool surface.
+You have exactly ten tools and NO shell. Your role is to: choose a workflow, fill constrained
+parameters, explain results, request approval, and interpret evidence. You must never invent,
+generate, or suggest raw shell commands or Python scripts, and you must never modify files
+directly - input changes go through preview_changes + human approval + apply_patch (which you
+cannot call). Submit only with a non-empty approval_ref after validation passed. Treat scheduler
+state (query_job_state) and scientific state (query_vasp_progress / parse_results) as separate
+facts. Every failure must go through diagnose_failure and propose_recovery before any retry.
+Keep answers concise and reply in the user's language."""
+
 
 TOOLS: list[dict[str, Any]] = [
     {
@@ -500,6 +510,50 @@ def execute_tool(controller: Controller, name: str, arguments: dict[str, Any]) -
     return {"ok": False, "error": f"unsupported tool: {name}"}
 
 
+def deterministic_execute(controller: Controller, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Deterministic-mode executor: the ten high-level tools only.
+
+    Server-facing tools go through the live gateway controller; the six
+    local tools (prepare/preview/diagnose/propose/parse/report) delegate to
+    agent_tools.dispatch, which only invokes the repository's deterministic
+    scripts. The model never obtains a shell in this mode.
+    """
+    import agent_tools
+
+    if name == "validate_calculation":
+        directory = arguments.get("directory")
+        if not isinstance(directory, str) or not directory:
+            return {"ok": False, "error": "directory is required"}
+        return controller.run("vasp-validate", "-RemotePath", directory)
+    if name == "query_vasp_progress":
+        directory = arguments.get("directory")
+        if not isinstance(directory, str) or not directory:
+            return {"ok": False, "error": "directory is required"}
+        return controller.run("vasp-progress", "-RemotePath", directory)
+    if name == "query_job_state":
+        return controller.run("jobs")
+    if name == "submit_approved_workflow":
+        approval_ref = str(arguments.get("approval_ref") or "").strip()
+        if not approval_ref:
+            return {"ok": False, "error": "approval_ref is required and must not be empty"}
+        directory = arguments.get("directory")
+        script = arguments.get("script")
+        if not isinstance(directory, str) or not isinstance(script, str):
+            return {"ok": False, "error": "directory and script are required"}
+        if not approve(f"Submit {directory}/{script} to Slurm? (approval: {approval_ref})"):
+            return {"ok": False, "denied": True, "error": "user denied job submission"}
+        return controller.run("submit", "-RemotePath", directory, "-JobScript", script)
+    # Local deterministic tools: same behavior as the agent_tools CLI.
+    return agent_tools.dispatch(name, arguments, {"workdir": ".", "server": controller.server or ""})
+
+
+# Active tool surface: default is the legacy operational set; --deterministic
+# swaps in the ten high-level tools and the deterministic executor.
+ACTIVE_TOOLS: list[dict[str, Any]] = TOOLS
+ACTIVE_EXECUTOR = execute_tool
+ACTIVE_SYSTEM_PROMPT = SYSTEM_PROMPT
+
+
 class DeepSeekClient:
     def __init__(self, api_key: str, base_url: str, model: str) -> None:
         self.api_key = api_key
@@ -517,7 +571,7 @@ class DeepSeekClient:
         body = json.dumps({
             "model": self.model,
             "messages": messages,
-            "tools": TOOLS,
+            "tools": ACTIVE_TOOLS,
             "tool_choice": "auto",
             "temperature": 0.1,
         }).encode("utf-8")
@@ -549,7 +603,7 @@ class DeepSeekClient:
         body = json.dumps({
             "model": self.model,
             "messages": messages,
-            "tools": TOOLS,
+            "tools": ACTIVE_TOOLS,
             "tool_choice": "auto",
             "temperature": 0.1,
             "stream": True,
@@ -646,7 +700,7 @@ def agent_turn(client: DeepSeekClient, controller: Controller, messages: list[di
                 result = {"ok": False, "error": f"invalid tool arguments: {exc}"}
             else:
                 print(f"[tool] {name}")
-                result = execute_tool(controller, name, arguments)
+                result = ACTIVE_EXECUTOR(controller, name, arguments)
             messages.append({
                 "role": "tool",
                 "tool_call_id": call.get("id", ""),
@@ -663,8 +717,18 @@ def main() -> int:
     parser.add_argument("--model", default=DEFAULT_MODEL)
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--server", default=None, help="server name from the gateway catalog (default: default_server)")
+    parser.add_argument("--deterministic", action="store_true",
+                        help="restrict the model to the ten high-level deterministic tools (no shell, no direct file tools)")
     parser.add_argument("prompt", nargs="*")
     args = parser.parse_args()
+
+    if args.deterministic:
+        import agent_tools
+        global ACTIVE_TOOLS, ACTIVE_EXECUTOR, ACTIVE_SYSTEM_PROMPT
+        ACTIVE_TOOLS = agent_tools.TOOL_SCHEMAS
+        ACTIVE_EXECUTOR = deterministic_execute
+        ACTIVE_SYSTEM_PROMPT = DETERMINISTIC_PROMPT
+        print("[deterministic mode] ten high-level tools, no shell, no direct file tools")
 
     api_key = os.environ.get("DEEPSEEK_API_KEY")
     if not api_key:
@@ -690,7 +754,7 @@ def main() -> int:
         print(f"error: unknown server: {chosen}", file=sys.stderr)
         return 2
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": ACTIVE_SYSTEM_PROMPT},
         {"role": "user", "content": server_context(entry)},
     ]
 
