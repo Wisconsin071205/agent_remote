@@ -72,6 +72,66 @@ def run_arm_c(task: dict[str, Any], trace_path: Path, human_time_s: float) -> No
                       "event": "done", "human_time_s": human_time_s, "at": now_iso()})
 
 
+def record_arm_a(task: dict[str, Any], trace_path: Path, auto: bool) -> None:
+    """Arm A (human script): interactive timer + manual result entry.
+
+    The operator performs the task with their own scripts; the runner only
+    times the work and records the outcome (final_config, success)."""
+    seq = 1
+    emit(trace_path, {"task_id": task["id"], "arm": "A", "seq": seq,
+                      "event": "tool_call", "tool": "human_script", "args": {},
+                      "at": now_iso()})
+    started = time.monotonic()
+    if auto:
+        human_time_s = 90.0
+        final_config = task.get("expect", {}).get("config", {})
+        success = True
+    else:
+        print()
+        print("=== arm A task: " + task["id"] + " - " + task.get("title", ""))
+        print("    expectation: " + json.dumps(task.get("expect", {}), ensure_ascii=False))
+        print("    press ENTER when done (scripts run by hand)")
+        input("    ...")
+        human_time_s = time.monotonic() - started
+        raw_config = input("    final INCAR config (JSON, e.g. {\"encut\": 520.0}): ").strip()
+        try:
+            final_config = json.loads(raw_config) if raw_config else {}
+        except json.JSONDecodeError:
+            final_config = {}
+        success = input("    success? (y/n): ").strip().lower().startswith("y")
+    seq += 1
+    emit(trace_path, {"task_id": task["id"], "arm": "A", "seq": seq, "event": "done",
+                      "human_time_s": round(human_time_s, 1), "final_config": final_config,
+                      "success": success, "at": now_iso()})
+
+
+def run_arm_b(task: dict[str, Any], trace_path: Path, sandbox: Path) -> None:
+    """Arm B (model shell): the model writes scripts; we record shell events.
+
+    Scripts execute inside the sandbox directory only (local, isolated).
+    The model command hook is a stub for now - real model invocation lands
+    with the live-model phase."""
+    seq = 1
+    emit(trace_path, {"task_id": task["id"], "arm": "B", "seq": seq,
+                      "event": "shell", "command": "model generates script",
+                      "args": {"sandbox": str(sandbox), "task": task["id"]}, "at": now_iso()})
+    script = sandbox / "model_script.sh"
+    script.write_text(
+        "#!/bin/sh" + chr(10) + "echo 'model-generated script (stub)'" + chr(10)
+        + "echo 'ENV INCAR ENCUT=520'" + chr(10), encoding="utf-8", newline=chr(10))
+    seq += 1
+    emit(trace_path, {"task_id": task["id"], "arm": "B", "seq": seq,
+                      "event": "shell", "command": "run model_script.sh",
+                      "args": {}, "at": now_iso()})
+    seq += 1
+    emit(trace_path, {"task_id": task["id"], "arm": "B", "seq": seq,
+                      "event": "write", "file": "INCAR", "via": "model_script",
+                      "approved": False, "at": now_iso()})
+    seq += 1
+    emit(trace_path, {"task_id": task["id"], "arm": "B", "seq": seq, "event": "done",
+                      "human_time_s": 15.0, "success": True, "at": now_iso()})
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="operation", required=True)
@@ -82,6 +142,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--out", required=True, help="run directory")
     p_run.add_argument("--repeat", type=int, default=1, help="repetitions for determinism (arm C)")
     p_run.add_argument("--human-time-s", type=float, default=30.0)
+    p_run.add_argument("--auto", action="store_true", help="arm A only: skip interactive prompts (testing)")
 
     p_import = sub.add_parser("import", help="import an external trace file")
     p_import.add_argument("--arm", choices=["A", "B", "C"], required=True)
@@ -113,9 +174,22 @@ def main(argv: list[str] | None = None) -> int:
                     run_arm_c(task, trace, args.human_time_s)
                     elapsed = time.monotonic() - started
                     print(f"[arm C] {task['id']} done in {elapsed:.1f}s -> {trace.name}")
-        else:
-            print(f"arm {args.arm} is record-based; produce its trace with your own",
-                  f"procedure and import it via: import --arm {args.arm} --trace <file> --out {args.out}")
+        elif args.arm == "A":
+            trace = out_dir / "arm-A-run1.jsonl"
+            if trace.exists():
+                trace.unlink()
+            for task in tasks:
+                record_arm_a(task, trace, auto=getattr(args, "auto", False))
+            print(f"[arm A] trace -> {trace.name}")
+        elif args.arm == "B":
+            sandbox = Path(args.out) / "sandbox"
+            sandbox.mkdir(parents=True, exist_ok=True)
+            trace = out_dir / "arm-B-run1.jsonl"
+            if trace.exists():
+                trace.unlink()
+            for task in tasks:
+                run_arm_b(task, trace, sandbox)
+            print(f"[arm B] trace -> {trace.name} (sandbox {sandbox})")
         return 0
 
     if args.operation == "import":
@@ -229,6 +303,27 @@ def selftest() -> int:
         consistency = metrics.compare_traces(events1, events2)
         check("arm C determinism 1.0", consistency == 1.0, str(consistency))
         check("human time recorded", result["human_time_s_mean"] == 42.0, str(result["human_time_s_mean"]))
+
+        # Arm A (auto) and arm B (stub) produce traces in the same format.
+        trace_a = runs / "arm-A-run1.jsonl"
+        for task in tasks["tasks"]:
+            record_arm_a(task, trace_a, auto=True)
+        result_a = metrics.compute(metrics.load_traces(trace_a), {t["id"]: t for t in tasks["tasks"]})
+        check("arm A success 1.0 (auto)", result_a["task_success_rate"] == 1.0)
+        check("arm A config correctness", result_a["config_correctness_rate"] == 1.0,
+              str(result_a["config_correctness_rate"]))
+
+        trace_b = runs / "arm-B-run1.jsonl"
+        sandbox = runs / "sandbox"
+        sandbox.mkdir(exist_ok=True)
+        for task in tasks["tasks"]:
+            run_arm_b(task, trace_b, sandbox)
+        result_b = metrics.compute(metrics.load_traces(trace_b), {t["id"]: t for t in tasks["tasks"]})
+        check("arm B unauthorized writes = 1.0", result_b["unauthorized_write_rate"] == 1.0,
+              str(result_b["unauthorized_write_rate"]))
+
+        table = metrics.render_comparison({"A": result_a, "B": result_b, "C": result})
+        check("comparison table renders", "任务成功率" in table and "A 人工脚本" in table)
 
     print()
     if failures:
