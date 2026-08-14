@@ -1,0 +1,4 @@
+interface:
+  display_name: "VASPilot"
+  short_description: "Visual VASP agent for multi-server HPC workflows"
+  default_prompt: "Use $vasp-remote-agent to open or operate my visual VASPilot workspace."

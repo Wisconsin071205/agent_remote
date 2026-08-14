@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="zh-CN">
+<title>API Key 自动恢复</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root {
+  /* dark-first palette */
+  --bg: #0f1217;
+  --panel: #151a21;
+  --panel2: #1a2029;
+  --chip: #20262f;
+  --ink: #e9e7e2;
+  --ink-dim: #9aa1ad;
+  --ink-faint: #69717d;
+  --line: #262d38;
+  --accent: #d9a441;
+  --accent-soft: rgba(217, 164, 65, 0.13);
+  --ok: #57b98a;
+  --bad: #e07b62;
+  --font-display: "Bahnschrift", "Segoe UI", sans-serif;
+  --font-body: "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f7f5f0;
+    --panel: #fffdf9;
+    --panel2: #f1eee6;
+    --chip: #eae6dc;
+    --ink: #20232a;
+    --ink-dim: #565d68;
+    --ink-faint: #8b919c;
+    --line: #e0dbd0;
+    --accent: #8a6a1f;
+    --accent-soft: rgba(138, 106, 31, 0.10);
+    --ok: #1e7a4f;
+    --bad: #b3452e;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f7f5f0;
+  --panel: #fffdf9;
+  --panel2: #f1eee6;
+  --chip: #eae6dc;
+  --ink: #20232a;
+  --ink-dim: #565d68;
+  --ink-faint: #8b919c;
+  --line: #e0dbd0;
+  --accent: #8a6a1f;
+  --accent-soft: rgba(138, 106, 31, 0.10);
+  --ok: #1e7a4f;
+  --bad: #b3452e;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 56px 28px 72px;
+}
+.seal {
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent) 38%, transparent 38%);
+  margin-bottom: 44px;
+}
+.eyebrow {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 14px;
+}
+h1 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(34px, 6vw, 48px);
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+  text-wrap: balance;
+  margin-bottom: 16px;
+}
+.lede {
+  font-size: 17px;
+  color: var(--ink-dim);
+  max-width: 60ch;
+  margin-bottom: 26px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  color: var(--ok);
+  border: 1px solid color-mix(in srgb, var(--ok) 45%, transparent);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+.pill::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* before / after */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 34px 0 52px;
+}
+.ba {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+.ba h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.ba .tag { color: var(--bad); }
+.ba.now .tag { color: var(--ok); }
+.ba p { font-size: 14.5px; color: var(--ink-dim); }
+
+/* lifecycle */
+.sec-title {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 15px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 20px;
+}
+.steps { border-left: 1px solid var(--line); padding-left: 0; }
+.step {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 4px 18px;
+  padding: 14px 0 20px 22px;
+  position: relative;
+}
+.step::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 22px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+}
+.step:last-child::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 32px;
+  bottom: -6px;
+  width: 1px;
+  background: linear-gradient(var(--line), transparent);
+}
+.num {
+  font-family: var(--font-display);
+  font-weight: 300;
+  font-size: 26px;
+  color: var(--accent);
+  line-height: 1;
+  padding-top: 2px;
+}
+.step h3 {
+  font-size: 15.5px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.step p {
+  font-size: 14.5px;
+  color: var(--ink-dim);
+  max-width: 58ch;
+}
+.step code, .inline-code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--chip);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+/* security grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 14px;
+  margin-bottom: 52px;
+}
+.card {
+  background: var(--panel2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px 20px;
+}
+.card h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 13.5px;
+  letter-spacing: 0.03em;
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.card h3::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--accent);
+  flex: none;
+}
+.card p { font-size: 13.5px; color: var(--ink-dim); line-height: 1.65; }
+
+/* verification */
+.numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 34px;
+}
+.numbox {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+.numbox .n {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 26px;
+  color: var(--accent);
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+.numbox .l { font-size: 12.5px; color: var(--ink-faint); }
+.checklist { list-style: none; margin-bottom: 44px; }
+.checklist li {
+  position: relative;
+  padding: 7px 0 7px 30px;
+  font-size: 14.5px;
+  color: var(--ink-dim);
+  border-bottom: 1px dashed var(--line);
+}
+.checklist li:last-child { border-bottom: none; }
+.checklist li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 14px;
+  width: 13px;
+  height: 7px;
+  border-left: 2.5px solid var(--ok);
+  border-bottom: 2.5px solid var(--ok);
+  transform: rotate(-45deg);
+}
+
+/* footnote */
+.foot {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+}
+@media (max-width: 620px) {
+  .before-after { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  body { animation: fade 0.5s ease both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+}
+a:focus-visible, *:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+<body>
+<div class="wrap">
+  <div class="seal"></div>
+  <p class="eyebrow">VASPilot · 安全更新</p>
+  <h1>API Key 自动恢复</h1>
+  <p class="lede">密钥以 Windows 凭据加密保存在本机，重启后只需登录，密钥自动回到内存——不再每次重填，也绝不明文落盘。</p>
+  <span class="pill">已部署 · 2026-08-14</span>
+
+  <div class="before-after">
+    <div class="ba">
+      <h3 class="tag">之前</h3>
+      <p>每次重启 VASPilot 都要在设置里重新粘贴 API Key，密钥只活在内存里，一关就丢。</p>
+    </div>
+    <div class="ba now">
+      <h3 class="tag">现在</h3>
+      <p>保存的密钥用 Windows 凭据（DPAPI）加密落盘；重启后登录一次，全部自动恢复，无需重输。</p>
+    </div>
+  </div>
+
+  <p class="sec-title">密钥的生命周期</p>
+  <div class="steps">
+    <div class="step">
+      <div class="num">01</div>
+      <div><h3>保存即加密</h3><p>设置里填入密钥，内存中保留明文供调用，磁盘上只写入绑定当前 Windows 用户的 DPAPI 密文。</p></div>
+    </div>
+    <div class="step">
+      <div class="num">02</div>
+      <div><h3>重启后内存为空</h3><p>进程重启，内存清空；磁盘密文保留，等待下次登录解密。</p></div>
+    </div>
+    <div class="step">
+      <div class="num">03</div>
+      <div><h3>登录自动恢复</h3><p>登录（或注册）时解密所有已保存的密文回内存，立刻可用。</p></div>
+    </div>
+    <div class="step">
+      <div class="num">04</div>
+      <div><h3>登出即清空</h3><p>登出会抹掉内存里的所有密钥；磁盘密文不动，下次登录再恢复。</p></div>
+    </div>
+  </div>
+
+  <p class="sec-title">安全属性</p>
+  <div class="grid">
+    <div class="card"><h3>明文只在内存</h3><p>磁盘与配置文件中只有密文，<code>local.json</code> 里搜索不到任何明文密钥。</p></div>
+    <div class="card"><h3>绑定 Windows 用户</h3><p>DPAPI 密文只对当前 Windows 账号可解，其他账号或另一台机器拿到文件也无法解开。</p></div>
+    <div class="card"><h3>登出即清空</h3><p>登出清空内存密钥；进程重启后内存同样为空，密钥不会残留。</p></div>
+    <div class="card"><h3>可主动清除</h3><p>设置里点「×」清除后不再恢复；删除某个服务商时，它的密文也会同步删除。</p></div>
+  </div>
+
+  <p class="sec-title">验证</p>
+  <div class="numbers">
+    <div class="numbox"><div class="n">12</div><div class="l">个测试套件全部通过</div></div>
+    <div class="numbox"><div class="n">0</div><div class="l">明文密钥出现在磁盘上</div></div>
+    <div class="numbox"><div class="n">8765</div><div class="l">端口 · 已重启部署</div></div>
+  </div>
+  <ul class="checklist">
+    <li>DPAPI 加解密往返、仅密文落盘、登录恢复、登出清空</li>
+    <li><code>__CLEAR__</code> 清除、删除服务商同步清理、无效密文跳过不崩溃</li>
+    <li>provider / 历史 / 审批 / 传输等原有功能回归无变化</li>
+    <li>健康检查正常，UI 监听 8765 端口（PID 31792）</li>
+  </ul>
+
+  <p class="foot">胡伟团队专用智能体 · 使用提示：重启后重新登录一次界面即可，无需再填密钥。</p>
+</div>
+</body>
+</html>

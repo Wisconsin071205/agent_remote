@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>胡伟团队专用智能体</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script>
+    // Apply the persisted theme before first paint to avoid a flash.
+    (function () {
+      var saved = localStorage.getItem("vaspilot.theme") || "dark";
+      if (saved === "auto") {
+        var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        saved = dark ? "dark" : "light";
+      }
+      document.documentElement.dataset.theme = saved;
+    })();
+  </script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 40 40"><path d="M20 5 32.5 12.3v15.4L20 35 7.5 27.7V12.3L20 5Z"/><circle cx="20" cy="20" r="4.2"/><path d="M11 20h5m8 0h5M20 9v7m0 8v7"/></svg>
+        </div>
+        <span>胡伟团队专用智能体</span>
+      </div>
+
+      <button id="newChat" class="new-chat">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        新建对话
+      </button>
+
+      <nav class="nav-group" aria-label="主要功能">
+        <div class="nav-label">工作台</div>
+        <button class="nav-item active" data-view="chat"><span class="nav-icon">⌁</span>智能助手</button>
+        <button class="nav-item" data-action="jobs"><span class="nav-icon">≋</span>任务队列</button>
+        <button class="nav-item" data-action="recent"><span class="nav-icon">◷</span>最近计算</button>
+      </nav>
+
+      <section class="project-panel">
+        <div class="server-panel-head">
+          <span>项目</span>
+          <button id="addProjectBtn" class="mini-button" type="button" title="新建项目" aria-label="新建项目">＋</button>
+        </div>
+        <div id="projectList" class="project-list">
+          <div class="activity-empty">登录后使用项目</div>
+        </div>
+      </section>
+
+      <section class="history-panel">
+        <div class="server-panel-head">
+          <span>历史对话</span>
+          <button id="refreshHistoryBtn" class="mini-button" type="button" title="刷新历史列表" aria-label="刷新历史列表">⟳</button>
+        </div>
+        <div id="historyList" class="history-list">
+          <div class="activity-empty">还没有历史对话</div>
+        </div>
+      </section>
+
+      <section class="server-panel">
+        <div class="server-panel-head">
+          <span>服务器</span>
+          <button id="addServerBtn" class="mini-button" type="button" title="添加服务器" aria-label="添加服务器">＋</button>
+        </div>
+        <div id="serverList" class="server-list">
+          <div class="activity-empty">正在加载服务器…</div>
+        </div>
+      </section>
+
+      <div class="sidebar-spacer"></div>
+
+      <div id="authArea" class="auth-panel"></div>
+
+      <div class="sidebar-foot">
+        <button id="settingsBtn" class="settings-button">
+          <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.86 2.86-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.1V21H9.5v-.1A1.7 1.7 0 0 0 8.4 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.86-2.86.06-.06A1.7 1.7 0 0 0 4 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.1-.4H2.2V9.5h.1A1.7 1.7 0 0 0 4 8.4a1.7 1.7 0 0 0-.34-1.88l-.06-.06L6.46 3.6l.06.06A1.7 1.7 0 0 0 8.4 4a1.7 1.7 0 0 0 1-.6A1.7 1.7 0 0 0 9.8 2.3v-.1h4.1v.1A1.7 1.7 0 0 0 15 4a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.86 2.86-.06.06A1.7 1.7 0 0 0 19.4 8.4a1.7 1.7 0 0 0 .6 1 1.7 1.7 0 0 0 1.1.4h.1v4.1h-.1a1.7 1.7 0 0 0-1.7 1.1Z"/></svg>
+          设置
+        </button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <span id="serverDot" class="server-dot"></span>
+          <span id="routeServer" class="route-server-name">—</span>
+          <span id="routeState" class="route-pill">等待检查</span>
+        </div>
+        <div class="top-actions">
+          <span id="modelBadge" class="model-badge">DeepSeek</span>
+          <select id="modelSelect" class="model-select" title="切换模型" aria-label="切换模型"></select>
+          <button id="themeBtn" class="icon-button" title="切换主题（深色/浅色/跟随系统）">
+            <svg viewBox="0 0 24 24" id="themeIcon"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
+          </button>
+          <button id="refreshBtn" class="icon-button" title="刷新连接状态">
+            <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <div class="dock-card">
+          <div class="dock-head">
+            <span class="dock-title">计算环境</span>
+            <div id="safetyNote" class="safety-note"><span>◇</span> 操作前确认 · 凭据不交给模型</div>
+          </div>
+          <div class="dock-field">
+            <span class="dock-label">计算目录</span>
+            <div class="dock-input-row">
+              <input id="calcPath" value="" placeholder="选择服务器后自动填充，或手动填写绝对路径" spellcheck="false" aria-label="VASP 计算目录">
+              <button id="validateBtn" class="dock-btn" type="button">预检查</button>
+              <button id="progressBtn" class="dock-btn" type="button">看进度</button>
+            </div>
+          </div>
+          <div class="dock-actions">
+            <button id="connectBtn" class="dock-btn primary" type="button">连接</button>
+            <button id="disconnectBtn" class="dock-btn" type="button">断开</button>
+            <button id="transferBtn" class="dock-btn" type="button" title="在两台服务器之间传输文件">传输</button>
+            <label id="autoApproveLabel" class="auto-approve" title="本会话内自动放行共享远端文件与提交/取消任务，重启后失效">
+              <input type="checkbox" id="autoApprove"> 全程免确认
+            </label>
+          </div>
+        </div>
+
+        <div id="welcome" class="welcome">
+          <div class="orb" aria-hidden="true">
+            <div class="orb-core"></div><i></i><i></i><i></i>
+          </div>
+          <p class="welcome-kicker" id="welcomeKicker">VASP · SLURM · —</p>
+          <h2>今天想检查哪个计算？</h2>
+          <p class="welcome-copy">告诉我计算目录或你的目标。我会先获取服务器证据，再判断输入、队列和收敛状态。</p>
+          <div class="suggestions">
+            <button data-prompt="检查我的任务队列，并解释每个任务的状态">检查任务队列<span>→</span></button>
+            <button data-prompt="请检查 your-calculation 目录的 VASP 输入，提交前找出问题">提交前检查<span>→</span></button>
+            <button data-prompt="分析 your-calculation 目录是否完成，以及电子和离子是否收敛">分析收敛情况<span>→</span></button>
+          </div>
+        </div>
+
+        <div id="messages" class="messages" aria-live="polite"></div>
+      </section>
+
+      <section class="composer-wrap">
+        <form id="chatForm" class="composer">
+          <textarea id="prompt" rows="1" placeholder="询问 VASP 计算、收敛情况或服务器任务…" aria-label="输入消息"></textarea>
+          <div class="composer-footer">
+            <div class="footer-left">
+              <span class="key-hint">Enter 发送 · Shift+Enter 换行 · / 命令 · Ctrl+N 新对话</span>
+            </div>
+            <button id="sendBtn" class="send-button" type="submit" aria-label="发送">
+              <svg viewBox="0 0 24 24"><path d="m5 12 7-7 7 7M12 5v14"/></svg>
+            </button>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <aside class="inspector">
+      <div class="inspector-head">
+        <span>运行概览</span>
+        <span class="live-pill"><i></i> LIVE</span>
+      </div>
+      <section class="metric-card">
+        <div class="metric-label">活动任务</div>
+        <div class="metric-row"><span>队列</span><strong id="jobCount">—</strong></div>
+        <div class="mini-chart"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </section>
+      <section class="metric-card">
+        <div class="metric-label">安全边界</div>
+        <ul class="check-list">
+          <li><i>✓</i>SSH 凭据隔离</li>
+          <li><i>✓</i>写入与提交需确认</li>
+          <li><i>✓</i>远端路径受限制</li>
+        </ul>
+      </section>
+      <section class="activity-card">
+        <div class="metric-label">最近活动</div>
+        <div id="activityList" class="activity-list">
+          <div class="activity-empty">还没有操作记录</div>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <dialog id="settingsDialog" class="modal settings-modal">
+    <div class="settings-layout">
+      <nav class="settings-nav" aria-label="设置分区">
+        <div class="settings-nav-group">
+          <div class="settings-nav-label">配置</div>
+          <button class="settings-nav-item active" data-settings-page="models" type="button">模型服务</button>
+          <button class="settings-nav-item" data-settings-page="connection" type="button">连接设置</button>
+          <button class="settings-nav-item" data-settings-page="appearance" type="button">外观</button>
+          <button class="settings-nav-item" data-settings-page="about" type="button">关于</button>
+        </div>
+        <div class="settings-nav-foot">
+          <button id="closeSettings" class="close-button" type="button" aria-label="关闭">×</button>
+        </div>
+      </nav>
+      <form id="settingsForm" class="settings-content" method="dialog">
+        <section class="settings-page" data-page="models">
+          <h3>模型服务</h3>
+          <p class="settings-hint">每个服务商有自己的 API 地址（可含端口）和密钥。密钥会以 Windows 凭据加密保存在本机（不明文落盘），重启后登录即自动恢复。切换模型用顶栏下拉框。</p>
+          <div id="providerList" class="provider-list"></div>
+          <button id="addProviderBtn" class="dock-btn" type="button">＋ 添加服务商</button>
+          <div class="settings-actions">
+            <div id="settingsError" class="modal-error" hidden></div>
+            <button id="saveSettings" type="submit" class="primary-button">保存设置</button>
+          </div>
+        </section>
+        <section class="settings-page" data-page="connection" hidden>
+          <h3>连接设置</h3>
+          <div class="setting-card">
+            <div class="setting-row">
+              <div class="setting-label"><div>Vlab PEM 私钥路径</div><div class="setting-desc">SSH 连接 Vlab 计算集群（vlab.ustc.edu.cn）用</div></div>
+              <input id="identityFile" placeholder="C:\Users\你的名字\.ssh\vlab-identity.pem" spellcheck="false">
+            </div>
+          </div>
+          <div class="setting-card">
+            <div class="setting-row">
+              <div class="setting-label"><div>远端服务器</div><div class="setting-desc">密码与六位验证码只在连接时于独立 SSH 窗口输入</div></div>
+              <span class="setting-static">在左侧「服务器」面板添加与连接，凭据不会保存在任何地方。</span>
+            </div>
+          </div>
+        </section>
+        <section class="settings-page" data-page="appearance" hidden>
+          <h3>外观</h3>
+          <div class="setting-card">
+            <div class="setting-row">
+              <div class="setting-label"><div>主题</div><div class="setting-desc">也可以点顶栏的月亮按钮快速切换</div></div>
+              <select id="settingsTheme">
+                <option value="dark">深色</option>
+                <option value="light">浅色</option>
+                <option value="auto">跟随系统</option>
+              </select>
+            </div>
+          </div>
+          <div class="setting-card">
+            <div class="setting-row">
+              <div class="setting-label"><div>壁纸</div><div class="setting-desc">静态图片或动态视频背景，应用后立即生效并保存在本机</div></div>
+              <select id="wallpaperMode">
+                <option value="none">无</option>
+                <option value="image">静态图片</option>
+                <option value="video">动态视频</option>
+              </select>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label"><div>本地文件</div><div class="setting-desc">图片建议 3MB 以内；视频较大时请用下方地址方式</div></div>
+              <div class="setting-controls">
+                <button id="wallpaperPick" class="dock-btn" type="button">选择文件…</button>
+                <span id="wallpaperFileName" class="setting-desc"></span>
+              </div>
+              <input id="wallpaperFile" type="file" accept="image/*,video/*" hidden>
+            </div>
+            <div class="setting-row">
+              <div class="setting-label"><div>图片/视频地址</div><div class="setting-desc">网络直链，如 https://…/wall.jpg 或 https://…/wall.mp4</div></div>
+              <input id="wallpaperUrl" placeholder="https://…" spellcheck="false">
+            </div>
+            <div class="setting-row">
+              <div class="setting-label"><div>暗化遮罩</div><div class="setting-desc">背景太亮时调高，让文字更清晰</div></div>
+              <input id="wallpaperDim" type="range" min="0" max="0.85" step="0.05" value="0.35">
+            </div>
+            <div class="setting-row wallpaper-actions">
+              <div class="setting-label"><div>操作</div><div class="setting-desc">应用当前设置，或一键移除壁纸</div></div>
+              <div class="setting-controls">
+                <button id="wallpaperApply" class="dock-btn primary" type="button">应用</button>
+                <button id="wallpaperClear" class="dock-btn" type="button">移除</button>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section class="settings-page" data-page="about" hidden>
+          <h3>关于</h3>
+          <div class="setting-card">
+            <div class="about-title">胡伟团队专用智能体</div>
+            <div class="about-line">VASP 远程计算助手 · 本地运行 · 配置存于 ~/.vaspilot</div>
+            <div class="setting-label">安全设计</div>
+            <ul class="check-list">
+              <li><i>✓</i>API Key 以 Windows 凭据加密保存，绝不明文落盘</li>
+              <li><i>✓</i>远端密码与验证码只在 SSH 窗口输入，绝不保存</li>
+              <li><i>✓</i>写操作与任务提交需要逐项确认</li>
+              <li><i>✓</i>远端工具被限制在根路径边界内</li>
+            </ul>
+          </div>
+        </section>
+      </form>
+    </div>
+  </dialog>
+
+  <dialog id="serverDialog" class="modal">
+    <form id="serverForm" method="dialog">
+      <div class="modal-head">
+        <div><span class="eyebrow">REMOTE SERVERS</span><h3 id="serverDialogTitle">添加服务器</h3></div>
+        <button id="closeServer" class="close-button" type="button" aria-label="关闭">×</button>
+      </div>
+      <label>服务器名称<input id="serverName" placeholder="如 hpc2（仅字母数字 . _ -）"></label>
+      <label>目标地址（用户名@主机）<input id="serverTarget" placeholder="user@example.edu"></label>
+      <div class="two-column">
+        <label>SSH 端口<input id="serverPort" type="number" value="22" min="1" max="65535"></label>
+        <label>连接保持时长<input id="serverPersist" placeholder="8h（可选）"></label>
+      </div>
+      <label>远端根路径（留空 = 登录用户主目录；工具只能在此边界内操作）<input id="serverRoot" placeholder="/home/user（不填则用主目录）"></label>
+      <p id="serverNote" class="modal-note">密码与六位验证码只在连接时于独立 SSH 窗口输入，任何地方都不会保存。删除会移除目录条目，不影响远端文件。</p>
+      <div id="serverError" class="modal-error" hidden></div>
+      <div class="modal-actions"><button id="cancelServer" type="button" class="secondary">取消</button><button id="saveServer" type="submit" class="primary-button">添加</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="authDialog" class="modal">
+    <form id="authForm" method="dialog">
+      <div class="modal-head">
+        <div><span class="eyebrow">LOCAL ACCOUNT</span><h3 id="authTitle">登录</h3></div>
+        <button id="closeAuth" class="close-button" type="button" aria-label="关闭">×</button>
+      </div>
+      <label>邮箱<input id="authEmail" type="email" placeholder="you@example.com" autocomplete="username"></label>
+      <label>密码<input id="authPassword" type="password" placeholder="至少 8 位" autocomplete="current-password"></label>
+      <p class="modal-note">账号只存储在本机（scrypt 哈希），用于解锁历史对话；不同设备之间不互通。密码不会被任何地方记录。</p>
+      <div class="modal-actions">
+        <button id="authSwitch" type="button" class="secondary">切换为注册</button>
+        <button id="authSubmit" type="submit" class="primary-button">登录</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="projectDialog" class="modal">
+    <form id="projectForm" method="dialog">
+      <div class="modal-head">
+        <div><span class="eyebrow">PROJECT</span><h3 id="projectDialogTitle">新建项目</h3></div>
+        <button id="closeProject" class="close-button" type="button" aria-label="关闭">×</button>
+      </div>
+      <label>项目名称<input id="projectName" placeholder="如：LiFePO4 结构优化" maxlength="40"></label>
+      <label>本地文件夹路径<input id="projectPath" placeholder="如：D:\VASP project\lfp" maxlength="260" spellcheck="false"></label>
+      <p class="modal-note">项目把对话历史按计算任务分开，打开某个项目时只显示该项目的历史。文件夹路径仅作为标识记录，程序不会读写该文件夹。</p>
+      <div class="modal-actions"><button id="cancelProject" type="button" class="secondary">取消</button><button id="saveProject" type="submit" class="primary-button">创建项目</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="commandDialog" class="modal command-modal"></dialog>
+
+  <dialog id="approvalDialog" class="modal approval-modal">
+    <div class="approval-icon">!</div>
+    <h3 id="approvalTitle">确认操作</h3>
+    <p id="approvalDescription"></p>
+    <div class="modal-actions"><button id="denyBtn" class="secondary">取消</button><button id="approveBtn" class="danger-button">确认执行</button></div>
+  </dialog>
+
+  <dialog id="transferDialog" class="modal">
+    <form id="transferForm" method="dialog">
+      <div class="modal-head">
+        <div><span class="eyebrow">CROSS-SERVER TRANSFER</span><h3>服务器间传输</h3></div>
+        <button id="closeTransfer" class="close-button" type="button" aria-label="关闭">×</button>
+      </div>
+      <p class="modal-note">把文件从一台服务器拷贝到另一台。传输经 Vlab 中转节点暂存，两端路径都必须位于各自的允许根目录内，且不能是根目录本身。</p>
+      <div class="two-column">
+        <label>源服务器<select id="transferFromServer"></select></label>
+        <label>目标服务器<select id="transferToServer"></select></label>
+      </div>
+      <label>源路径<input id="transferFromPath" placeholder="/public/home/user/calc/dir" spellcheck="false"></label>
+      <label>目标路径<input id="transferToPath" placeholder="/public/home/user/calc/dir" spellcheck="false"></label>
+      <p class="modal-note">填写后点击「开始传输」会先弹出确认框，批准后开始执行（大文件可能需要较长时间）。</p>
+      <div id="transferError" class="modal-error" hidden></div>
+      <div class="modal-actions"><button id="cancelTransfer" type="button" class="secondary">取消</button><button id="startTransfer" type="submit" class="primary-button">开始传输</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
