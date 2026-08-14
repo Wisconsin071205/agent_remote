@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 日志（含测试产生的运行日志）
+*.log
+*.log.err
+
+# 敏感导出：conversation-export.html 曾包含服务器认证信息，禁止入库
+# （轮换凭据并重新生成脱敏版本后才可移除此条目）
+conversation-export.html
+
+# 本地编辑器与系统文件
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+
+# 本地 Python 虚拟环境
+.venv/
+venv/
