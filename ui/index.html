@@ -92,6 +92,9 @@
         <div class="top-actions">
           <span id="modelBadge" class="model-badge">DeepSeek</span>
           <select id="modelSelect" class="model-select" title="切换模型" aria-label="切换模型"></select>
+          <button id="terminalToggleBtn" class="icon-button terminal-toggle-button" type="button" title="打开人工终端（Ctrl+`）" aria-label="打开人工终端" aria-expanded="false">
+            <span>&gt;_</span>
+          </button>
           <button id="themeBtn" class="icon-button" title="切换主题（深色/浅色/跟随系统）">
             <svg viewBox="0 0 24 24" id="themeIcon"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>
           </button>
@@ -140,6 +143,16 @@
         </div>
 
         <div id="messages" class="messages" aria-live="polite"></div>
+      </section>
+
+      <section id="terminalDock" class="terminal-dock" aria-label="人工终端" hidden>
+        <div id="terminalResizeHandle" class="terminal-resize-handle" role="separator" aria-orientation="horizontal" aria-label="拖动调整终端高度" tabindex="0"></div>
+        <header class="terminal-dock-head">
+          <div id="terminalTabs" class="terminal-tabs" role="tablist" aria-label="服务器终端"></div>
+          <span class="terminal-privacy">人工操作 · 不进入智能体上下文</span>
+          <button id="terminalMinimizeBtn" class="terminal-dock-action" type="button" title="收起终端" aria-label="收起终端">—</button>
+        </header>
+        <div id="terminalFrames" class="terminal-frames"></div>
       </section>
 
       <section class="composer-wrap">
