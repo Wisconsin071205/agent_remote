@@ -239,10 +239,10 @@ function createAssistantNode() {
   node.className = "message assistant";
   node.innerHTML = `<div class="avatar">V</div><div><div class="message-meta">VASPILOT</div><div class="stream-content"></div></div>`;
   const content = node.querySelector(".stream-content");
-  const reasoning = document.createElement("div");
+  const reasoning = document.createElement("details");
   reasoning.className = "reasoning-box";
   reasoning.hidden = true;
-  reasoning.innerHTML = `<div class="reasoning-label">思考过程</div><div class="reasoning-text"></div>`;
+  reasoning.innerHTML = `<summary class="reasoning-label">思考过程</summary><div class="reasoning-text"></div>`;
   const tools = document.createElement("div");
   tools.className = "tool-list";
   const text = document.createElement("div");
@@ -250,7 +250,7 @@ function createAssistantNode() {
   content.append(reasoning, tools, text);
   $("#messages").appendChild(node);
   node.scrollIntoView({ behavior: "smooth", block: "end" });
-  return { node, reasoningText: reasoning.querySelector(".reasoning-text"), tools, text };
+  return { node, reasoningText: reasoning.querySelector(".reasoning-text"), tools, text, lastReasoningRound: 0 };
 }
 
 function sendRequest(message) {
@@ -260,6 +260,15 @@ function sendRequest(message) {
   streamRequest("/api/chat", { message }, {
     reasoning(data) {
       view.reasoningText.parentElement.hidden = false;
+      // Multi-round thinking: separate rounds with a divider instead of
+      // appending into one endless wall of text.
+      const round = data.round || 1;
+      if (round > view.lastReasoningRound) {
+        if (view.lastReasoningRound > 0 && view.reasoningText.textContent) {
+          view.reasoningText.textContent += "\n\n━━━ 下一轮思考 ━━━\n";
+        }
+        view.lastReasoningRound = round;
+      }
       view.reasoningText.textContent += data.delta || "";
       view.node.scrollIntoView({ behavior: "smooth", block: "end" });
     },

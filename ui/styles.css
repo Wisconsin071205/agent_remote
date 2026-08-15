@@ -325,6 +325,8 @@ body.terminal-resizing { cursor: row-resize; user-select: none; }
 /* ============ Streaming chat: reasoning, tools, code, chips ============ */
 .stream-content { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .reasoning-box { border-left: 2px solid var(--accent-line); padding: 6px 12px; background: var(--panel); border-radius: 0 10px 10px 0; }
+.reasoning-box summary.reasoning-label { cursor: pointer; user-select: none; list-style-position: inside; }
+.reasoning-box[open] summary.reasoning-label { color: var(--accent); }
 .reasoning-label { color: var(--muted-2); font-size: 9px; letter-spacing: .14em; margin-bottom: 5px; }
 .reasoning-text { color: var(--muted); font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 .tool-list { display: flex; flex-direction: column; gap: 4px; }
