@@ -11,6 +11,7 @@ const state = {
   editingServer: null,
   editingSnapshot: null,
   projects: [], activeProject: null,
+  terminals: new Map(), activeTerminal: "", terminalDockOpen: false,
   // Non-stream action awaiting approval (server-to-server transfer); when set,
   // the approval dialog answers /api/action/approve instead of /api/approve.
   pendingAction: null,
@@ -440,7 +441,7 @@ function renderServers() {
           <div class="server-target">${escapeHtml(server.target)} · ${escapeHtml(server.root || "主目录")}</div>
         </div>
         <button class="row-edit" type="button" title="编辑属性" data-edit="${escapeHtml(server.name)}">✎</button>
-        <button class="row-terminal" type="button" title="打开人工终端（仅您本人操作，智能体不可见）" data-terminal="${escapeHtml(server.name)}">&gt;_</button>
+        <button class="row-terminal" type="button" title="在底部打开人工终端（不进入智能体上下文）" data-terminal="${escapeHtml(server.name)}">&gt;_</button>
         <button class="server-del" type="button" title="从目录中删除" data-remove="${escapeHtml(server.name)}">×</button>
       </div>`;
   }).join("");
@@ -494,12 +495,149 @@ async function selectServer(name) {
   }
 }
 
+const TERMINAL_HEIGHT_KEY = "vaspilot.terminalHeight";
+
+function renderTerminalDock() {
+  const dock = $("#terminalDock");
+  const tabs = $("#terminalTabs");
+  const hasSessions = state.terminals.size > 0;
+  const visible = hasSessions && state.terminalDockOpen;
+  dock.hidden = !visible;
+  $("#terminalToggleBtn").classList.toggle("active", hasSessions);
+  $("#terminalToggleBtn").setAttribute("aria-expanded", String(visible));
+  $("#terminalToggleBtn").title = hasSessions
+    ? (visible ? "收起人工终端（Ctrl+`）" : "展开人工终端（Ctrl+`）")
+    : "打开人工终端（Ctrl+`）";
+
+  tabs.replaceChildren();
+  for (const [name, iframe] of state.terminals) {
+    const tab = document.createElement("div");
+    tab.className = "terminal-tab" + (name === state.activeTerminal ? " active" : "");
+
+    const select = document.createElement("button");
+    select.type = "button";
+    select.className = "terminal-tab-select";
+    select.role = "tab";
+    select.setAttribute("aria-selected", String(name === state.activeTerminal));
+    select.textContent = name;
+    select.title = `切换到 ${name} 人工终端`;
+    select.addEventListener("click", () => activateManualTerminal(name));
+
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "terminal-tab-close";
+    close.textContent = "×";
+    close.title = `关闭 ${name} 终端并断开会话`;
+    close.setAttribute("aria-label", close.title);
+    close.addEventListener("click", () => closeManualTerminal(name));
+
+    tab.append(select, close);
+    tabs.appendChild(tab);
+    iframe.hidden = name !== state.activeTerminal;
+  }
+}
+
+function activateManualTerminal(name) {
+  if (!state.terminals.has(name)) return;
+  state.activeTerminal = name;
+  state.terminalDockOpen = true;
+  renderTerminalDock();
+}
+
 function openManualTerminal(name) {
-  // Open the in-browser human terminal in a NEW window so the main UI keeps
-  // running untouched; every terminal window gets its own session.
-  const url = "/terminal.html?server=" + encodeURIComponent(name);
-  window.open(url, "_blank");
-  addActivity("打开人工终端", name);
+  if (!name) {
+    toast("请先选择服务器");
+    return;
+  }
+  let iframe = state.terminals.get(name);
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.className = "terminal-frame";
+    iframe.title = `${name} 人工终端`;
+    iframe.src = "/terminal.html?embedded=1&server=" + encodeURIComponent(name);
+    iframe.referrerPolicy = "no-referrer";
+    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin");
+    $("#terminalFrames").appendChild(iframe);
+    state.terminals.set(name, iframe);
+    addActivity("打开人工终端", name);
+  }
+  activateManualTerminal(name);
+}
+
+function closeManualTerminal(name) {
+  const iframe = state.terminals.get(name);
+  if (!iframe) return;
+  iframe.remove();
+  state.terminals.delete(name);
+  if (state.activeTerminal === name) {
+    state.activeTerminal = state.terminals.keys().next().value || "";
+  }
+  if (!state.terminals.size) state.terminalDockOpen = false;
+  renderTerminalDock();
+  addActivity("关闭人工终端", name);
+}
+
+function toggleTerminalDock() {
+  if (!state.terminals.size) {
+    openManualTerminal(state.active);
+    return;
+  }
+  state.terminalDockOpen = !state.terminalDockOpen;
+  renderTerminalDock();
+}
+
+function initTerminalDock() {
+  const dock = $("#terminalDock");
+  const handle = $("#terminalResizeHandle");
+  const savedHeight = parseInt(localStorage.getItem(TERMINAL_HEIGHT_KEY) || "300", 10);
+
+  function setHeight(height, persist = false) {
+    const maximum = Math.max(220, Math.floor(window.innerHeight * 0.7));
+    const value = Math.max(170, Math.min(maximum, height));
+    dock.style.height = `${value}px`;
+    if (persist) localStorage.setItem(TERMINAL_HEIGHT_KEY, String(value));
+  }
+
+  if (Number.isFinite(savedHeight)) setHeight(savedHeight);
+  $("#terminalToggleBtn").addEventListener("click", toggleTerminalDock);
+  $("#terminalMinimizeBtn").addEventListener("click", () => {
+    state.terminalDockOpen = false;
+    renderTerminalDock();
+  });
+
+  let startY = 0;
+  let startHeight = 0;
+  handle.addEventListener("pointerdown", event => {
+    if (event.button !== 0) return;
+    startY = event.clientY;
+    startHeight = dock.getBoundingClientRect().height;
+    handle.setPointerCapture(event.pointerId);
+    dock.classList.add("resizing");
+    document.body.classList.add("terminal-resizing");
+  });
+  handle.addEventListener("pointermove", event => {
+    if (!handle.hasPointerCapture(event.pointerId)) return;
+    setHeight(startHeight + startY - event.clientY);
+  });
+  function finishResize(event) {
+    if (!handle.hasPointerCapture(event.pointerId)) return;
+    handle.releasePointerCapture(event.pointerId);
+    dock.classList.remove("resizing");
+    document.body.classList.remove("terminal-resizing");
+    localStorage.setItem(TERMINAL_HEIGHT_KEY, String(Math.round(dock.getBoundingClientRect().height)));
+  }
+  handle.addEventListener("pointerup", finishResize);
+  handle.addEventListener("pointercancel", finishResize);
+  handle.addEventListener("keydown", event => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    const delta = event.key === "ArrowUp" ? 20 : -20;
+    setHeight(dock.getBoundingClientRect().height + delta, true);
+  });
+  window.addEventListener("resize", () => {
+    if (!dock.hidden) setHeight(dock.getBoundingClientRect().height);
+  });
+  renderTerminalDock();
 }
 
 async function addServer(payload) {
@@ -1126,6 +1264,7 @@ const COMMANDS = [
   { label: "最近计算", hint: "", run: () => quickAction("recent") },
   { label: "连接当前服务器", hint: "", run: () => connectServer() },
   { label: "断开当前服务器", hint: "", run: () => disconnectServer() },
+  { label: "打开人工终端", hint: "Ctrl+`", run: () => openManualTerminal(state.active) },
   { label: "添加服务器", hint: "", run: () => openServerDialog() },
   { label: "刷新服务器状态", hint: "", run: () => refreshServers(true) },
   { label: "预检查计算目录", hint: "计算目录", run: () => quickAction("vasp-validate", ["-RemotePath", $("#calcPath").value]) },
@@ -1188,6 +1327,10 @@ document.addEventListener("keydown", event => {
   if ((event.ctrlKey || event.metaKey) && event.key === ",") {
     event.preventDefault();
     $("#settingsDialog").showModal();
+  }
+  if ((event.ctrlKey || event.metaKey) && event.code === "Backquote") {
+    event.preventDefault();
+    toggleTerminalDock();
   }
 });
 $$('[data-prompt]').forEach(button => button.addEventListener("click", () => sendMessage(button.dataset.prompt)));
@@ -1517,4 +1660,5 @@ $("#cancelServer").addEventListener("click", () => $("#serverDialog").close());
 // Poll connection states every 10s; refreshServers guards concurrent runs.
 setInterval(() => refreshServers(), 10000);
 
+initTerminalDock();
 init();
