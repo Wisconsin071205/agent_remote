@@ -622,6 +622,12 @@ def do_cancel(args: argparse.Namespace) -> int:
 
 
 def do_diagnostic(args: argparse.Namespace) -> int:
+    if args.name == "scheduler":
+        name, entry = resolve_server(args.server)
+        scheduler = scheduler_for(name, entry)
+        print(scheduler)
+        audit("diagnostic", "ok", f"scheduler={scheduler}", name)
+        return 0
     commands = {
         "hostname": "hostname -f",
         "pwd": "pwd",
@@ -947,7 +953,7 @@ def parser() -> argparse.ArgumentParser:
     cancel.add_argument("confirm_job_id")
     cancel.set_defaults(handler=do_cancel)
     diag = sub.add_parser("diagnostic", parents=[server])
-    diag.add_argument("name", choices=["hostname", "pwd", "disk", "quota", "partitions", "modules"])
+    diag.add_argument("name", choices=["hostname", "pwd", "disk", "quota", "partitions", "modules", "scheduler"])
     diag.set_defaults(handler=do_diagnostic)
     for operation in ("vasp-inspect", "vasp-validate", "vasp-progress"):
         vasp = sub.add_parser(operation, parents=[server])

@@ -12,7 +12,7 @@ param(
     [string]$JobScript,
     [string]$JobId,
     [string]$ConfirmJobId,
-    [ValidateSet("hostname", "pwd", "disk", "quota", "partitions", "modules")]
+    [ValidateSet("hostname", "pwd", "disk", "quota", "partitions", "modules", "scheduler")]
     [string]$Diagnostic,
     [ValidateRange(1, 2000)]
     [int]$Lines = 80,
