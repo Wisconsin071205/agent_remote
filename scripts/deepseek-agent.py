@@ -50,6 +50,19 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "switch_active_server",
+            "description": "Switch the active server to another catalog server (e.g. cl9 to cl12). After switching, every subsequent tool call acts on the newly active server. Requires no approval; only changes which host tools target.",
+            "parameters": {
+                "type": "object",
+                "properties": {"server_name": {"type": "string", "description": "Catalog server name to activate"}},
+                "required": ["server_name"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "server_identity",
             "description": "Show the connected server's hostname, Unix user, home, and working directory.",
             "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
@@ -365,8 +378,10 @@ def server_context(server: dict[str, Any]) -> str:
     return (
         f'The active server is "{name}" (target {target}, allowed root {root}, '
         f"connected: {connected}). All tools act on this server. Remote paths "
-        f"outside {root} are rejected. If the server is disconnected, tell the "
-        f"user to establish the connection interactively (SSH password and "
+        f"outside {root} are rejected. You may switch to another catalog server "
+        f"with the switch_active_server tool at any time; after switching, every "
+        f"tool acts on the newly active server. If a server is disconnected, tell "
+        f"the user to establish the connection interactively (SSH password and "
         f"six-digit code are never handled by this agent)."
     )
 
@@ -422,6 +437,19 @@ class Controller:
 def execute_tool(controller: Controller, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     if name == "connection_status":
         return controller.run("status")
+    if name == "switch_active_server":
+        target = arguments.get("server_name")
+        if not isinstance(target, str) or not target.strip():
+            return {"ok": False, "error": "server_name is required"}
+        catalog = controller.run("servers")
+        if not catalog.get("ok"):
+            return {"ok": False, "error": catalog.get("error") or "could not read the server catalog"}
+        servers = catalog.get("data", {}).get("servers", [])
+        entry = next((s for s in servers if s.get("name") == target.strip()), None)
+        if entry is None:
+            return {"ok": False, "error": f"unknown server: {target}"}
+        controller.server = target.strip()
+        return {"ok": True, "switched": True, "server": target.strip(), "entry": entry}
     if name == "server_identity":
         return controller.run("whoami")
     if name == "list_jobs":
@@ -727,6 +755,14 @@ def agent_turn(client: DeepSeekClient, controller: Controller, messages: list[di
             else:
                 print(f"[tool] {name}")
                 result = ACTIVE_EXECUTOR(controller, name, arguments)
+            if result.get("switched") and result.get("entry"):
+                # Rewrite the per-turn server context so the model knows every
+                # subsequent tool call targets the newly active server.
+                for index, msg in enumerate(messages):
+                    if msg.get("role") == "user" and isinstance(msg.get("content"), str) \
+                            and msg["content"].startswith("The active server is"):
+                        messages[index]["content"] = server_context(result["entry"])
+                        break
             messages.append({
                 "role": "tool",
                 "tool_call_id": call.get("id", ""),

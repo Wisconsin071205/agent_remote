@@ -351,7 +351,12 @@
       </div>
       <label>项目名称<input id="projectName" placeholder="如：LiFePO4 结构优化" maxlength="40"></label>
       <label>本地文件夹路径<input id="projectPath" placeholder="如：D:\VASP project\lfp" maxlength="260" spellcheck="false"></label>
-      <p class="modal-note">项目把对话历史按计算任务分开，打开某个项目时只显示该项目的历史。文件夹路径仅作为标识记录，程序不会读写该文件夹。</p>
+      <label class="remote-project-row">
+        <span><input type="checkbox" id="projectCreateRemote"> 改为在服务器上创建项目目录</span>
+        <select id="projectServer" disabled></select>
+        <input id="projectServerPath" placeholder="服务器目录，如 /public/home/user/calc/lfp" maxlength="260" spellcheck="false" disabled>
+      </label>
+      <p class="modal-note">勾选后会在所选服务器上创建该目录（mkdir -p），项目记录绑定远端路径；否则仅在本机记录标识，不触碰任何文件。</p>
       <div class="modal-actions"><button id="cancelProject" type="button" class="secondary">取消</button><button id="saveProject" type="submit" class="primary-button">创建项目</button></div>
     </form>
   </dialog>

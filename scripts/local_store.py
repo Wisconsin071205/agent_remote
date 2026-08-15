@@ -242,8 +242,12 @@ class LocalStore:
             })
         return out
 
-    def add_project(self, name, path):
-        """Register a project. Raises ValueError with a user-safe message."""
+    def add_project(self, name, path, **extra):
+        """Register a project. Raises ValueError with a user-safe message.
+
+        Extra keyword fields (e.g. server="cl9") are stored verbatim in the
+        project record so server-side projects keep their host association.
+        """
         name = (name or "").strip()
         path = (path or "").strip()
         if not name or len(name) > NAME_MAX:
@@ -264,6 +268,7 @@ class LocalStore:
             "name": name,
             "path": path,
             "created": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            **extra,
         }
         projects.append(project)
         self._write(data)

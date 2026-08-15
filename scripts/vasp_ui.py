@@ -372,6 +372,27 @@ def approval_summary(name: str, arguments: dict[str, Any]) -> tuple[str, str]:
 def execute_tool(controller: Any, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     if name == "connection_status":
         return controller.run("status")
+    if name == "switch_active_server":
+        target = str(arguments.get("server_name") or "").strip()
+        if not target:
+            return {"ok": False, "error": "server_name is required"}
+        if not any(s.get("name") == target for s in STATE.servers):
+            STATE.refresh_servers()
+        entry = next((s for s in STATE.servers if s.get("name") == target), None)
+        if entry is None:
+            return {"ok": False, "error": f"服务器目录中没有 {target}"}
+        STATE.active_server = target
+        # Rewrite the per-turn context so the model knows the new active server.
+        chat = STATE.chat
+        if chat is not None and chat.context_index is not None:
+            try:
+                chat.messages[chat.context_index] = {
+                    "role": "user",
+                    "content": AGENT.server_context(entry),
+                }
+            except (IndexError, AttributeError):
+                pass
+        return {"ok": True, "switched": True, "server": target}
     if name == "server_identity":
         return controller.run("whoami")
     if name == "list_jobs":
@@ -1361,7 +1382,23 @@ class Handler(BaseHTTPRequestHandler):
             self.require_login()
             name = str(payload.get("name", "")).strip()
             folder = str(payload.get("path", "")).strip()
-            STATE.local.add_project(name, folder)  # user-safe ValueError
+            server = str(payload.get("server", "")).strip()
+            create_remote = bool(payload.get("create_remote"))
+            if create_remote:
+                # Server-side project: create the directory on the chosen
+                # server, then bind the project record to that remote path.
+                if not server:
+                    raise ValueError("请先选择服务器")
+                if not any(s.get("name") == server for s in STATE.servers):
+                    STATE.refresh_servers()
+                if not any(s.get("name") == server for s in STATE.servers):
+                    raise ValueError(f"服务器目录中没有 {server}")
+                result = STATE.controller(server=server).run("mkdir", "-RemotePath", folder)
+                if not result.get("ok"):
+                    raise ValueError(result.get("error") or result.get("output") or "远端目录创建失败")
+                STATE.local.add_project(name, folder, server=server)
+            else:
+                STATE.local.add_project(name, folder)  # user-safe ValueError
             self.json_response({"ok": True, "projects": STATE.local.list_projects()})
             return
         if path == "/api/projects/remove":

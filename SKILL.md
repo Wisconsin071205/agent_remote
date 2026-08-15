@@ -61,7 +61,7 @@ Run `scripts/start-ui.ps1` to open the local VASPilot interface. Configure the V
 - Never weaken SSH host-key checking. Stop and report a changed host key.
 - Do not bypass the controller to run arbitrary remote shell commands.
 - Keep all remote file operations under the active server's `remote_root`; the gateway enforces containment per server and refuses copy/move/remove on the root itself.
-- When the UI shows multiple servers, the model acts only on the active server named in the per-turn server context; it has no tool to switch servers.
+- When the UI shows multiple servers, the model acts on the active server named in the per-turn server context; it may switch the active server at any time with `switch_active_server` (no approval needed - it only changes which host tools target). Approvals still bind to the server they were requested for: approving after a switch invalidates the action.
 
 ## Deterministic workflow tools
 

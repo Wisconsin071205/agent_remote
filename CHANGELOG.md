@@ -4,6 +4,13 @@
 
 ## [未发布] — 确定性工作流内核（进行中）
 
+### 多服务器管理与服务器项目
+- switch_active_server 工具：智能体可在对话中切换活动服务器（cl9↔cl12），
+  切换后上下文即时更新，后续工具自动作用于新服务器；审批仍校验切换前后
+  服务器一致（防写错主机）
+- 项目可在服务器上创建：新建项目对话框勾选「在服务器上创建项目目录」，
+  选择服务器并填远端路径，保存时自动 mkdir -p 并将项目绑定到远端目录
+
 ### PBS/Torque 调度器支持
 - gateway 支持 Slurm 与 PBS 双调度器：jobs/recent/submit/cancel 按服务器
   的 scheduler 字段分派（qstat/qsub/qdel vs squeue/sbatch/scancel）

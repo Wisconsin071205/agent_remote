@@ -1155,8 +1155,25 @@ function openProjectDialog() {
   $("#projectForm").reset();
   $("#projectDialogTitle").textContent = "新建项目";
   $("#saveProject").textContent = "创建项目";
+  const select = $("#projectServer");
+  select.innerHTML = state.servers
+    .map(server => `<option value="${escapeHtml(server.name)}">${escapeHtml(server.name)}</option>`)
+    .join("");
+  if (state.active) select.value = state.active;
+  $("#projectCreateRemote").checked = false;
+  syncRemoteProjectFields();
   $("#projectDialog").showModal();
   $("#projectName").focus();
+}
+
+function syncRemoteProjectFields() {
+  const checked = $("#projectCreateRemote").checked;
+  $("#projectServer").disabled = !checked;
+  $("#projectServerPath").disabled = !checked;
+  if (checked && !$("#projectServerPath").value) {
+    const root = (state.servers.find(server => server.name === $("#projectServer").value) || {}).root || "";
+    $("#projectServerPath").value = root ? root + "/" : "";
+  }
 }
 
 function showSessionBar(title, count, iso) {
@@ -1619,16 +1636,32 @@ $("#projectList").addEventListener("click", event => {
   if (row) switchProject(row.dataset.project);
 });
 $("#addProjectBtn").addEventListener("click", openProjectDialog);
+$("#projectCreateRemote").addEventListener("change", syncRemoteProjectFields);
+$("#projectServer").addEventListener("change", () => {
+  const root = (state.servers.find(server => server.name === $("#projectServer").value) || {}).root || "";
+  if (root && (!$("#projectServerPath").value || $("#projectServerPath").value === root + "/")) {
+    $("#projectServerPath").value = root + "/";
+  }
+});
 $("#projectForm").addEventListener("submit", async event => {
   event.preventDefault();
   const name = $("#projectName").value.trim();
-  const path = $("#projectPath").value.trim();
+  const createRemote = $("#projectCreateRemote").checked;
+  const path = createRemote ? $("#projectServerPath").value.trim() : $("#projectPath").value.trim();
+  if (!path) { toast(createRemote ? "请填写服务器目录路径" : "请填写本地文件夹路径"); return; }
+  const body = { name, path };
+  if (createRemote) {
+    body.server = $("#projectServer").value;
+    body.create_remote = true;
+  }
   try {
-    const data = await request("/api/projects/add", { method: "POST", body: { name, path } });
+    const data = await request("/api/projects/add", { method: "POST", body });
     state.projects = data.projects || [];
     renderProjects();
     $("#projectDialog").close();
-    toast(`已创建项目「${name}」`);
+    toast(createRemote
+      ? "已在服务器上创建目录并绑定项目「" + name + "」"
+      : "已创建项目「" + name + "」");
   } catch (error) { toast(error.message); }
 });
 $("#closeProject").addEventListener("click", () => $("#projectDialog").close());
