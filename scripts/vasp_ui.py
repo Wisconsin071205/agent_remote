@@ -739,9 +739,9 @@ def launch_connect_terminal(server_name: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# In-browser human terminal: each window gets its own ssh session behind a
-# random term_id. The model has no tool for these endpoints; the human types
-# the password and six-digit OTP in the browser window itself.
+# In-browser human terminal: each docked tab/standalone page gets its own ssh
+# session behind a random term_id. The model has no tool for these endpoints;
+# the human types the password and six-digit OTP in the terminal frame itself.
 # ---------------------------------------------------------------------------
 TERMINAL_SESSIONS: dict[str, dict[str, Any]] = {}
 TERMINAL_LOCK = threading.Lock()
@@ -773,12 +773,6 @@ def launch_web_terminal(server_name: str) -> str:
         remote_command,
     ]
     creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    proc = subprocess.Popen(
-        command,
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        text=True, encoding="utf-8", errors="replace", bufsize=0,
-        creationflags=creationflags,
-    )
     with TERMINAL_LOCK:
         # Drop finished sessions as a fallback when a window closed without
         # /api/term/close (e.g. the browser tab was killed).
@@ -788,6 +782,15 @@ def launch_web_terminal(server_name: str) -> str:
             TERMINAL_SESSIONS.pop(tid, None)
         if len(TERMINAL_SESSIONS) >= MAX_TERMINALS:
             raise ValueError(f"终端会话已达上限 {MAX_TERMINALS}，请先关闭不再使用的终端窗口")
+        # Keep the capacity check and process registration in one critical
+        # section. Otherwise concurrent opens can exceed the limit, and a
+        # rejected request can leave an untracked ssh process behind.
+        proc = subprocess.Popen(
+            command,
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", errors="replace", bufsize=0,
+            creationflags=creationflags,
+        )
         term_id = secrets.token_hex(8)
         session: dict[str, Any] = {"proc": proc, "output": [], "pos": 0,
                                    "lock": threading.Lock(), "server": server_name}
@@ -984,7 +987,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/":
             path = "/index.html"
         relative = path.lstrip("/")
-        if relative not in {"index.html", "app.js", "styles.css", "favicon.svg", "terminal.html"}:
+        if relative not in {
+            "index.html", "app.js", "styles.css", "favicon.svg",
+            "terminal.html", "terminal.js",
+        }:
             self.send_error(404)
             return
         file_path = UI_DIR / relative
@@ -1144,6 +1150,13 @@ class Handler(BaseHTTPRequestHandler):
                 # download (and os.startfile must never run while locked).
                 self.handle_config_path(path, payload)
                 return
+            if path in {"/api/terminal", "/api/term/output", "/api/term/input", "/api/term/close"}:
+                # Terminal endpoints must never hold STATE.lock: launching ssh
+                # or refreshing the catalog (an SSH round trip that can stall
+                # for minutes on network trouble) under the lock deadlocks the
+                # whole UI - which is exactly what "save has no effect" was.
+                self.handle_terminal_path(path, payload)
+                return
             if path in {
                 "/api/approve", "/api/reset",
                 "/api/conversations/new", "/api/conversations/load",
@@ -1165,6 +1178,45 @@ class Handler(BaseHTTPRequestHandler):
             self.json_response({"ok": False, "error": str(exc)}, 400)
         except Exception as exc:
             self.json_response({"ok": False, "error": f"内部错误：{exc}"}, 500)
+
+    def handle_terminal_path(self, path: str, payload: dict[str, Any]) -> None:
+        """Terminal endpoints, deliberately OUTSIDE STATE.lock: launching ssh
+        or refreshing the catalog can stall for minutes on network trouble and
+        must never block the rest of the UI (this caused the 'save settings
+        has no effect' freeze)."""
+        if path == "/api/terminal":
+            # Web terminal for the HUMAN operator. It can run in a docked iframe
+            # or a standalone page; the model has no tool for these endpoints
+            # and the UI never copies session contents into the chat context.
+            name = str(payload.get("name") or STATE.active_server or "").strip()
+            if not name:
+                raise ValueError("尚未确定当前服务器，请先刷新服务器列表")
+            if not any(s.get("name") == name for s in STATE.servers):
+                # Refresh outside the lock; on gateway trouble this stalls only
+                # THIS request, not the whole UI.
+                STATE.refresh_servers()
+            if not any(s.get("name") == name for s in STATE.servers):
+                raise ValueError(f"服务器目录中没有 {name}")
+            term_id = launch_web_terminal(name)
+            self.json_response({"ok": True, "term_id": term_id,
+                                "message": f"已为 {name} 打开网页终端（仅限您本人操作）"})
+            return
+        if path == "/api/term/output":
+            term_id = str(payload.get("term_id") or "").strip()
+            self.json_response(term_read(term_id))
+            return
+        if path == "/api/term/input":
+            term_id = str(payload.get("term_id") or "").strip()
+            data = str(payload.get("data") or "")
+            if len(data) > 16384:
+                raise ValueError("单次输入过长")
+            self.json_response(term_write(term_id, data))
+            return
+        if path == "/api/term/close":
+            term_id = str(payload.get("term_id") or "").strip()
+            self.json_response(term_close(term_id))
+            return
+        self.send_error(404)
 
     def handle_config_path(self, path: str, payload: dict[str, Any]) -> None:
         if path == "/api/config":
@@ -1309,36 +1361,6 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("尚未确定当前服务器，请先刷新服务器列表")
             launch_connect_terminal(name)
             self.json_response({"ok": True, "message": f"已为 {name} 打开 SSH 认证窗口"})
-            return
-        if path == "/api/terminal":
-            # Web terminal for the HUMAN operator: opens an in-browser terminal
-            # window (window.open from the UI). The model has no tool for these
-            # endpoints and never sees the session contents.
-            name = str(payload.get("name") or STATE.active_server or "").strip()
-            if not name:
-                raise ValueError("尚未确定当前服务器，请先刷新服务器列表")
-            if not any(s.get("name") == name for s in STATE.servers):
-                STATE.refresh_servers()
-            if not any(s.get("name") == name for s in STATE.servers):
-                raise ValueError(f"服务器目录中没有 {name}")
-            term_id = launch_web_terminal(name)
-            self.json_response({"ok": True, "term_id": term_id,
-                                "message": f"已为 {name} 打开网页终端（仅限您本人操作）"})
-            return
-        if path == "/api/term/output":
-            term_id = str(payload.get("term_id") or "").strip()
-            self.json_response(term_read(term_id))
-            return
-        if path == "/api/term/input":
-            term_id = str(payload.get("term_id") or "").strip()
-            data = str(payload.get("data") or "")
-            if len(data) > 16384:
-                raise ValueError("单次输入过长")
-            self.json_response(term_write(term_id, data))
-            return
-        if path == "/api/term/close":
-            term_id = str(payload.get("term_id") or "").strip()
-            self.json_response(term_close(term_id))
             return
         if path == "/api/servers/select":
             name = str(payload.get("name", "")).strip()
@@ -1579,6 +1601,7 @@ class Handler(BaseHTTPRequestHandler):
 def check_installation() -> int:
     required = [
         UI_DIR / "index.html", UI_DIR / "styles.css", UI_DIR / "app.js", UI_DIR / "favicon.svg",
+        UI_DIR / "terminal.html", UI_DIR / "terminal.js",
         AGENT_PATH, SCRIPT_DIR / "vasp-agent.ps1",
     ]
     missing = [str(path) for path in required if not path.is_file()]
