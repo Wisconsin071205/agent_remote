@@ -28,6 +28,7 @@ DEFAULTS = {
     "port": 22,
     "remote_root": "/home/user",
     "persist": "8h",
+    "scheduler": "auto",
 }
 SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$")
 TARGET_RE = re.compile(r"^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+$")
@@ -35,7 +36,7 @@ PERSIST_RE = re.compile(r"^(yes|no|[0-9]+[smhdw]?)$")
 MAX_SERVERS = 32
 SAFE_REMOTE_PATH = re.compile(r"^/[A-Za-z0-9._/+@=-]+$")
 SAFE_JOB_SCRIPT = re.compile(r"^[A-Za-z0-9._+-]+$")
-SAFE_JOB_ID = re.compile(r"^[0-9]+(?:_[0-9]+)?$")
+SAFE_JOB_ID = re.compile(r"^[0-9]+(?:_[0-9]+)?(?:\.[A-Za-z0-9.-]+)?$")
 
 
 def audit(operation: str, outcome: str, detail: str = "", server: str = "") -> None:
@@ -194,6 +195,9 @@ def validate_server(name: str, entry: dict) -> None:
     port = entry.get("port")
     if not isinstance(port, int) or not 1 <= port <= 65535:
         raise ValueError(f"server {name}: port must be an integer from 1 to 65535")
+    scheduler = entry.get("scheduler", "auto")
+    if scheduler not in ("auto", "slurm", "pbs"):
+        raise ValueError(f"server {name}: scheduler must be auto, slurm or pbs")
     root = entry.get("remote_root")
     # Empty remote_root means "use the login user's home directory", probed
     # lazily from the live connection; it is never a full-filesystem boundary.
@@ -537,24 +541,82 @@ def do_trash_list(args: argparse.Namespace) -> int:
     return result.returncode
 
 
+# ---------------------------------------------------------------------------
+# Scheduler abstraction: Slurm and PBS are both supported. The catalog may pin
+# a scheduler per server ("slurm" / "pbs"); the default "auto" probes the
+# login shell once and caches the answer.
+# ---------------------------------------------------------------------------
+SCHEDULER_CACHE: dict[str, str] = {}
+
+
+def scheduler_for(name: str, entry: dict) -> str:
+    pinned = entry.get("scheduler", "auto")
+    if pinned in ("slurm", "pbs"):
+        return pinned
+    cached = SCHEDULER_CACHE.get(name)
+    if cached:
+        return cached
+    result = remote(
+        name,
+        "if command -v qsub >/dev/null 2>&1; then echo pbs; "
+        "elif command -v sbatch >/dev/null 2>&1; then echo slurm; else echo unknown; fi",
+        capture=True,
+    )
+    detected = (result.stdout or "").strip()
+    if detected not in ("slurm", "pbs"):
+        raise RuntimeError(f"cannot detect the scheduler on {name} (got {detected!r})")
+    SCHEDULER_CACHE[name] = detected
+    return detected
+
+
+def do_jobs(args: argparse.Namespace) -> int:
+    name, entry = resolve_server(args.server)
+    scheduler = scheduler_for(name, entry)
+    if scheduler == "pbs":
+        command = 'qstat -u "$(id -un)"'
+    else:
+        command = 'squeue -u "$(id -un)" -o "%.18i %.9P %.30j %.8u %.2t %.10M %.6D %R"'
+    result = remote(name, command)
+    audit("jobs", "ok" if result.returncode == 0 else "failed", scheduler, name)
+    return result.returncode
+
+
+def do_recent(args: argparse.Namespace) -> int:
+    name, entry = resolve_server(args.server)
+    scheduler = scheduler_for(name, entry)
+    if scheduler == "pbs":
+        command = 'qstat -x -u "$(id -un)"'
+    else:
+        command = 'sacct -u "$(id -un)" --starttime today -X -o JobID,JobName%30,Partition,State,Elapsed,ExitCode'
+    result = remote(name, command)
+    audit("recent", "ok" if result.returncode == 0 else "failed", scheduler, name)
+    return result.returncode
+
+
 def do_submit(args: argparse.Namespace) -> int:
     name, entry = resolve_server(args.server)
     directory = validated_remote_path(args.directory, entry, name)
     if not SAFE_JOB_SCRIPT.fullmatch(args.script):
         raise ValueError("job script must be a simple filename")
-    command = f"cd -- {shlex.quote(directory)} && sbatch -- {shlex.quote(args.script)}"
+    scheduler = scheduler_for(name, entry)
+    if scheduler == "pbs":
+        command = f"cd -- {shlex.quote(directory)} && qsub -- {shlex.quote(args.script)}"
+    else:
+        command = f"cd -- {shlex.quote(directory)} && sbatch -- {shlex.quote(args.script)}"
     result = remote(name, command)
     audit("submit", "ok" if result.returncode == 0 else "failed", f"{directory}/{args.script}", name)
     return result.returncode
 
 
 def do_cancel(args: argparse.Namespace) -> int:
-    name, _ = resolve_server(args.server)
+    name, entry = resolve_server(args.server)
     if not SAFE_JOB_ID.fullmatch(args.job_id):
-        raise ValueError("invalid Slurm job id")
+        raise ValueError("invalid job id")
     if args.confirm_job_id != args.job_id:
         raise ValueError("confirmation job id must exactly match the requested job id")
-    result = remote(name, f"scancel -- {shlex.quote(args.job_id)}")
+    scheduler = scheduler_for(name, entry)
+    command = f"qdel -- {shlex.quote(args.job_id)}" if scheduler == "pbs" else f"scancel -- {shlex.quote(args.job_id)}"
+    result = remote(name, command)
     audit("cancel", "ok" if result.returncode == 0 else "failed", args.job_id, name)
     return result.returncode
 
@@ -705,6 +767,7 @@ def do_server_add(args: argparse.Namespace) -> int:
         "target": args.target,
         "port": args.port,
         "remote_root": args.remote_root or "",
+        "scheduler": getattr(args, "scheduler", "auto"),
         "persist": args.persist,
     }
     validate_server(name, entry)
@@ -816,8 +879,8 @@ def parser() -> argparse.ArgumentParser:
     sub.add_parser("connect", parents=[server]).set_defaults(handler=do_connect)
     sub.add_parser("disconnect", parents=[server]).set_defaults(handler=do_disconnect)
     sub.add_parser("whoami", parents=[server]).set_defaults(handler=lambda a: do_simple("whoami", "printf 'host=%s\\nuser=%s\\nhome=%s\\npwd=%s\\n' \"$(hostname -f)\" \"$(id -un)\" \"$HOME\" \"$PWD\"", a.server))
-    sub.add_parser("jobs", parents=[server]).set_defaults(handler=lambda a: do_simple("jobs", "squeue -u \"$(id -un)\" -o '%.18i %.9P %.30j %.8u %.2t %.10M %.6D %R'", a.server))
-    sub.add_parser("recent", parents=[server]).set_defaults(handler=lambda a: do_simple("recent", "sacct -u \"$(id -un)\" --starttime today -X -o JobID,JobName%30,Partition,State,Elapsed,ExitCode", a.server))
+    sub.add_parser("jobs", parents=[server]).set_defaults(handler=do_jobs)
+    sub.add_parser("recent", parents=[server]).set_defaults(handler=do_recent)
     sub.add_parser("servers").set_defaults(handler=do_servers)
 
     add = sub.add_parser("server-add")
@@ -827,6 +890,8 @@ def parser() -> argparse.ArgumentParser:
     add.add_argument("--root", default=None, dest="remote_root",
                      help="optional; when omitted the login user's home directory is the boundary")
     add.add_argument("--persist", default=DEFAULTS["persist"])
+    add.add_argument("--scheduler", choices=["auto", "slurm", "pbs"], default="auto",
+                     help="job scheduler on this server (auto = probe on first use)")
     add.set_defaults(handler=do_server_add)
     remove_cat = sub.add_parser("server-remove")
     remove_cat.add_argument("name")

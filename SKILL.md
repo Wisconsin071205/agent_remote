@@ -15,6 +15,12 @@ Read [references/setup.md](references/setup.md) when configuring a new computer 
 
 Invoke `scripts/vasp-agent.ps1` from PowerShell. Pass the Vlab PEM path with `-IdentityFile` or set `VLAB_IDENTITY_FILE`.
 
+Schedulers: both **Slurm** and **PBS/Torque** are supported. Each server's
+`scheduler` catalog field may pin `slurm` or `pbs`; the default `auto`
+probes the login shell on first use (qsub vs sbatch) and caches the answer.
+`jobs`/`recent`/`submit`/`cancel` dispatch to `squeue/sacct/sbatch/scancel`
+or `qstat/qsub/qdel` accordingly.
+
 ```powershell
 ./scripts/vasp-agent.ps1 servers                 # list catalog + per-server state
 ./scripts/vasp-agent.ps1 status                  # default server
