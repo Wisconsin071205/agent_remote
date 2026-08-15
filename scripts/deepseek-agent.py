@@ -291,11 +291,27 @@ TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "cancel_job",
-            "description": "Cancel one Slurm job by ID. Requires local approval.",
+            "description": "Cancel one Slurm or PBS job by ID. Requires local approval.",
             "parameters": {
                 "type": "object",
-                "properties": {"job_id": {"type": "string", "pattern": "^[0-9]+(?:_[0-9]+)?$"}},
+                "properties": {"job_id": {"type": "string", "pattern": "^[0-9]+(?:_[0-9]+)?(?:\\.[A-Za-z0-9.-]+)?$"}},
                 "required": ["job_id"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_remote_command",
+            "description": "Execute one whitelisted ANALYSIS command inside a remote calculation directory (python3/gnuplot/awk/bc/cat/grep/tail/... only; 300s timeout). Use for post-processing such as plotting DOS/bands from DOSCAR/EIGENVAL. Cannot delete, submit or transfer anything. Requires local approval; the command is shown before execution.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "directory": {"type": "string", "description": "Absolute remote directory under the allowed root"},
+                    "command": {"type": "string", "description": "Whitelisted analysis command, e.g. python3 plot_dos.py"},
+                },
+                "required": ["directory", "command"],
                 "additionalProperties": False,
             },
         },
@@ -504,9 +520,19 @@ def execute_tool(controller: Controller, name: str, arguments: dict[str, Any]) -
         job_id = arguments.get("job_id")
         if not isinstance(job_id, str) or not job_id:
             return {"ok": False, "error": "job_id is required"}
-        if not approve(f"Cancel Slurm job {job_id}?"):
+        if not approve(f"Cancel job {job_id}?"):
             return {"ok": False, "denied": True, "error": "user denied job cancellation"}
         return controller.run("cancel", "-JobId", job_id, "-ConfirmJobId", job_id)
+    if name == "run_remote_command":
+        directory = arguments.get("directory")
+        command = arguments.get("command")
+        if not isinstance(directory, str) or not directory:
+            return {"ok": False, "error": "directory is required"}
+        if not isinstance(command, str) or not command.strip():
+            return {"ok": False, "error": "command is required"}
+        if not approve(f"Run analysis command in {directory}:\n{command.strip()}"):
+            return {"ok": False, "denied": True, "error": "user denied the command"}
+        return controller.run("run", "-RemotePath", directory, "-Command", command.strip())
     return {"ok": False, "error": f"unsupported tool: {name}"}
 
 

@@ -51,6 +51,7 @@ RISKY_TOOLS = {
     "move_remote_path",
     "remove_remote_path",
     "purge_remote_path",
+    "run_remote_command",
     "upload_file",
     "download_file",
     "transfer_remote_files",
@@ -353,6 +354,8 @@ def approval_summary(name: str, arguments: dict[str, Any]) -> tuple[str, str]:
         return "移入隔离区", f"确认把远端 {arguments.get('path', '')} 移入隔离区吗？文件不会丢失，可用 purge 永久删除（需另行审批）。"
     if name == "purge_remote_path":
         return "永久删除（隔离区）", f"确认永久删除隔离区内的 {arguments.get('path', '')} 吗？此操作不可恢复！"
+    if name == "run_remote_command":
+        return "远端分析命令", f"确认在 {arguments.get('directory', '')} 执行白名单分析命令：\n{arguments.get('command', '')}"
     if name == "upload_file":
         return "上传文件到远端", f"确认把本地 {arguments.get('local_path', '')} 上传到远端 {arguments.get('remote_path', '')} 吗？"
     if name == "download_file":
@@ -408,6 +411,14 @@ def execute_tool(controller: Any, name: str, arguments: dict[str, Any]) -> dict[
         if not isinstance(confirm_path, str) or confirm_path != path:
             return {"ok": False, "error": "确认路径必须与待删除路径完全一致"}
         return controller.run("purge", "-RemotePath", path, "-ConfirmPath", confirm_path)
+    if name == "run_remote_command":
+        directory = arguments.get("directory")
+        command = arguments.get("command")
+        if not isinstance(directory, str) or not directory:
+            return {"ok": False, "error": "缺少目录"}
+        if not isinstance(command, str) or not command.strip():
+            return {"ok": False, "error": "缺少命令"}
+        return controller.run("run", "-RemotePath", directory, "-Command", command.strip())
     if name == "upload_file":
         local_path, remote_path = arguments.get("local_path"), arguments.get("remote_path")
         if not isinstance(local_path, str) or not isinstance(remote_path, str) or not local_path or not remote_path:
@@ -700,9 +711,11 @@ def run_chat_loop_stream(emit) -> None:
 
         check_abort()
         repair_incomplete_tool_messages(chat.messages)
+        reasoning_round = chat.rounds + 1
         message = client.complete_stream(
             chat.messages,
-            lambda kind, text: emit("reasoning" if kind == "reasoning" else "delta", {"delta": text}),
+            lambda kind, text: emit("reasoning" if kind == "reasoning" else "delta",
+                                    {"delta": text, "round": reasoning_round}),
         )
         chat.messages.append(message)
         calls = message.get("tool_calls") or []

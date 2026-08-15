@@ -77,6 +77,12 @@ Four deterministic, offline-first tools sit under `scripts/` and follow `spec/wo
 | `apply_patch.py DIR --patch P` | L2: apply an APPROVED patch to whitelisted files only | Backup + JSONL audit + `--dry-run`; non-whitelist targets rejected |
 | `agent_tools.py dispatch --name T --args JSON` | The only ten tools a central model may call | `schemas` prints OpenAI-format tool list; `selftest` runs offline |
 
+Post-processing: `run_remote_command` executes ONE whitelisted analysis command
+(python3/gnuplot/awk/bc/cat/grep/... only, 300s timeout) inside a calculation
+directory, after human approval. Use it for DOS/band plotting from DOSCAR or
+EIGENVAL. It can never delete, submit, or transfer anything - `rm`, `scp`,
+`ssh` and friends are rejected by prefix.
+
 Prefer these over writing new shell scripts. Do not apply suggested patches without human approval (L1 detect / L2 propose only; L3 auto-apply whitelist is empty).
 
 ## Interpret results

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0, Mandatory = $true)]
-    [ValidateSet("status", "connect", "disconnect", "whoami", "jobs", "recent", "vasp-inspect", "vasp-validate", "vasp-progress", "read", "tail", "list", "mkdir", "copy", "move", "remove", "submit", "cancel", "diagnostic", "upload", "download", "transfer", "servers", "server-add", "server-remove", "server-set-default", "server-edit")]
+    [ValidateSet("status", "connect", "disconnect", "whoami", "jobs", "recent", "vasp-inspect", "vasp-validate", "vasp-progress", "read", "tail", "list", "mkdir", "copy", "move", "remove", "submit", "cancel", "diagnostic", "run", "upload", "download", "transfer", "servers", "server-add", "server-remove", "server-set-default", "server-edit")]
     [string]$Operation,
     [string]$IdentityFile = $env:VLAB_IDENTITY_FILE,
     [string]$VlabHost = "vlab.ustc.edu.cn",
@@ -12,6 +12,7 @@ param(
     [string]$JobScript,
     [string]$JobId,
     [string]$ConfirmJobId,
+    [string]$Command,
     [ValidateSet("hostname", "pwd", "disk", "quota", "partitions", "modules", "scheduler")]
     [string]$Diagnostic,
     [ValidateRange(1, 2000)]
@@ -126,6 +127,11 @@ switch ($Operation) {
     "submit" {
         if (-not $RemotePath -or -not $JobScript) { throw "submit requires -RemotePath (directory) and -JobScript." }
         Invoke-Gateway @("submit", $RemotePath, $JobScript); $code = $script:GatewayExitCode
+    }
+    "run" {
+        if (-not $RemotePath) { throw "run requires -RemotePath (calculation directory)." }
+        if (-not $Command) { throw "run requires -Command (whitelisted analysis command)." }
+        Invoke-Gateway @("run", $RemotePath, $Command); $code = $script:GatewayExitCode
     }
     "cancel" {
         if (-not $JobId -or -not $ConfirmJobId) { throw "cancel requires -JobId and matching -ConfirmJobId." }

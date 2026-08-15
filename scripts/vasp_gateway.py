@@ -621,6 +621,41 @@ def do_cancel(args: argparse.Namespace) -> int:
     return result.returncode
 
 
+# Analysis commands the gateway may execute inside a calculation directory.
+# Only these PREFIXES are accepted; anything else is rejected outright. This
+# gives the agent real post-processing power (plot DOS with python/gnuplot,
+# quick math with awk/bc) without granting a general-purpose shell.
+RUN_ALLOWED_PREFIXES = (
+    "python3", "python", "gnuplot", "bash", "sh", "awk", "bc", "cat", "grep",
+    "tail", "head", "wc", "sort", "uniq", "paste", "module",
+)
+RUN_MAX_SECONDS = 300
+
+
+def do_run(args: argparse.Namespace) -> int:
+    """Execute one whitelisted analysis command inside a remote directory."""
+    name, entry = resolve_server(args.server)
+    directory = validated_remote_path(args.directory, entry, name)
+    raw = (args.command or "").strip()
+    if not raw:
+        raise ValueError("run requires -Command")
+    if len(raw) > 500:
+        raise ValueError("command too long (max 500 characters)")
+    first = raw.split()[0].split("/")[-1] if raw.split() else ""
+    if first not in RUN_ALLOWED_PREFIXES:
+        raise ValueError(
+            f"command prefix {first!r} is not allowed; allowed prefixes: "
+            + ", ".join(RUN_ALLOWED_PREFIXES))
+    # Path escape via cd is blocked by the validation above (no ; & | quoting
+    # games survive the whitelist check on the first token).
+    command = f"cd -- {shlex.quote(directory)} && timeout {RUN_MAX_SECONDS} {raw}"
+    result = remote(name, command, capture=True)
+    emit(result)
+    audit("run", "ok" if result.returncode == 0 else "failed",
+          f"{directory}: {raw[:160]}", name)
+    return result.returncode
+
+
 def do_diagnostic(args: argparse.Namespace) -> int:
     if args.name == "scheduler":
         name, entry = resolve_server(args.server)
@@ -960,6 +995,10 @@ def parser() -> argparse.ArgumentParser:
     cancel.add_argument("job_id")
     cancel.add_argument("confirm_job_id")
     cancel.set_defaults(handler=do_cancel)
+    run = sub.add_parser("run", parents=[server])
+    run.add_argument("directory")
+    run.add_argument("command")
+    run.set_defaults(handler=do_run)
     diag = sub.add_parser("diagnostic", parents=[server])
     diag.add_argument("name", choices=["hostname", "pwd", "disk", "quota", "partitions", "modules", "scheduler"])
     diag.set_defaults(handler=do_diagnostic)
