@@ -379,6 +379,13 @@ body[data-wallpaper] .sidebar { border-right-color: color-mix(in srgb, var(--lin
 body[data-wallpaper] .inspector { border-left-color: color-mix(in srgb, var(--line-soft) 55%, transparent); }
 body[data-wallpaper] .topbar { border-bottom-color: color-mix(in srgb, var(--line-soft) 55%, transparent); }
 
+/* ============ Harness-style tool presentation ============ */
+.tool-result { margin-top: 2px; border: 1px solid var(--line-soft); border-radius: 8px; background: var(--code-bg); overflow: hidden; }
+.tool-result summary { cursor: pointer; padding: 5px 10px; font: 10.5px var(--mono); color: var(--muted); user-select: none; }
+.tool-result summary:hover { color: var(--text); }
+.tool-result pre { margin: 0; padding: 8px 10px; border-top: 1px solid var(--line-soft); font: 11px/1.55 var(--mono); color: var(--text); opacity: .85; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow-y: auto; }
+.tool-result[open] summary { color: var(--accent); }
+
 /* 外观设置页：壁纸控件布局 */
 .setting-controls { display: flex; align-items: center; gap: 8px; }
 .setting-row input[type="range"] { min-width: 220px; padding: 0; accent-color: var(--accent); cursor: pointer; }

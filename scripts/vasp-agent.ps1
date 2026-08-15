@@ -24,6 +24,7 @@ param(
     [int]$ServerPort = 22,
     [string]$ServerRoot,
     [string]$ServerPersist,
+    [string]$ServerScheduler,
     [string]$NewName,
     [string]$FromServer,
     [string]$FromPath,
@@ -67,6 +68,7 @@ switch ($Operation) {
         $addArgs = @("server-add", $ServerName, "--target", $ServerTarget, "--port", [string]$ServerPort)
         if ($ServerRoot) { $addArgs += @("--root", $ServerRoot) }
         if ($ServerPersist) { $addArgs += @("--persist", $ServerPersist) }
+        if ($ServerScheduler) { $addArgs += @("--scheduler", $ServerScheduler) }
         Invoke-Gateway $addArgs -NoServer; $code = $script:GatewayExitCode
     }
     "server-remove" {
@@ -85,7 +87,8 @@ switch ($Operation) {
         if ($PSBoundParameters.ContainsKey("ServerPort")) { $editArgs += @("--port", [string]$ServerPort) }
         if ($PSBoundParameters.ContainsKey("ServerRoot")) { $editArgs += @("--root", $ServerRoot) }
         if ($ServerPersist) { $editArgs += @("--persist", $ServerPersist) }
-        if ($editArgs.Count -eq 2) { throw "server-edit requires at least one of -ServerTarget, -ServerPort, -ServerRoot, -ServerPersist." }
+        if ($ServerScheduler) { $editArgs += @("--scheduler", $ServerScheduler) }
+        if ($editArgs.Count -eq 2) { throw "server-edit requires at least one of -ServerTarget, -ServerPort, -ServerRoot, -ServerPersist, -ServerScheduler." }
         Invoke-Gateway $editArgs -NoServer; $code = $script:GatewayExitCode
     }
     { $_ -in @("vasp-inspect", "vasp-validate", "vasp-progress") } {

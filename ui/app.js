@@ -272,7 +272,13 @@ function sendRequest(message) {
       const line = document.createElement("div");
       line.className = "tool-line running";
       line.dataset.name = data.name || "";
-      line.textContent = `⚙ 正在调用 ${data.name || "工具"}…`;
+      let argsText = "";
+      try {
+        const args = data.args || {};
+        const keys = Object.keys(args);
+        if (keys.length) argsText = " · " + keys.map(k => k + "=" + JSON.stringify(args[k])).join(" ").slice(0, 160);
+      } catch { /* ignore */ }
+      line.textContent = "⚙ " + (data.name || "工具") + argsText + " …";
       view.tools.appendChild(line);
       addActivity("调用工具", data.name || "");
     },
@@ -285,7 +291,18 @@ function sendRequest(message) {
       if (line) {
         line.classList.remove("running");
         line.classList.add(data.ok ? "ok" : "fail");
-        line.textContent = `${data.ok ? "✓" : "✗"} ${name}${detail}`;
+        line.textContent = (data.ok ? "✓" : "✗") + " " + name + detail;
+      }
+      // Harness-style: show the full (truncated) tool result in a collapsible block.
+      if (data.result_text) {
+        const details = document.createElement("details");
+        details.className = "tool-result";
+        const summary = document.createElement("summary");
+        summary.textContent = (data.ok ? "✓ " : "✗ ") + (name || "工具") + " 结果";
+        const pre = document.createElement("pre");
+        pre.textContent = data.result_text;
+        details.append(summary, pre);
+        view.tools.appendChild(details);
       }
       addActivity(data.ok ? "工具完成" : "工具失败", `${name}${data.ok && data.summary ? " · " + data.summary : ""}`);
       // A model-initiated transfer was approved and runs in the background:
@@ -755,7 +772,7 @@ function openServerDialog(server = null) {
     // Snapshot the original values so submit can send only what changed;
     // sending the pre-filled target/port back to a connected server would
     // trip the gateway's "disconnect first" guard even though nothing moved.
-    state.editingSnapshot = { target: server.target, port: server.port, root: server.root, persist: server.persist || "" };
+    state.editingSnapshot = { target: server.target, port: server.port, root: server.root, persist: server.persist || "", scheduler: server.scheduler || "auto" };
     $("#serverDialogTitle").textContent = "编辑服务器";
     $("#serverName").value = server.name;
     $("#serverName").disabled = false;
@@ -763,6 +780,7 @@ function openServerDialog(server = null) {
     $("#serverPort").value = server.port;
     $("#serverRoot").value = server.root;
     $("#serverPersist").value = server.persist || "";
+    $("#serverScheduler").value = server.scheduler || "auto";
     $("#saveServer").textContent = "保存修改";
     $("#serverNote").textContent = "改名称或地址端口需要先断开该服务器；根路径与保持时长可随时修改。";
   } else {
@@ -770,6 +788,7 @@ function openServerDialog(server = null) {
     state.editingSnapshot = null;
     $("#serverDialogTitle").textContent = "添加服务器";
     $("#serverName").disabled = false;
+    $("#serverScheduler").value = "auto";
     $("#saveServer").textContent = "添加";
     $("#serverNote").textContent = "密码与六位验证码只在连接时于独立 SSH 窗口输入，任何地方都不会保存。删除会移除目录条目，不影响远端文件。";
   }
@@ -1614,6 +1633,7 @@ $("#serverForm").addEventListener("submit", async event => {
       port: parseInt($("#serverPort").value, 10),
       root: $("#serverRoot").value.trim(),
       persist: $("#serverPersist").value.trim(),
+      scheduler: $("#serverScheduler").value || "auto",
     };
     if (state.editingServer) {
       // Edit mode: send only what the user actually changed. The snapshot is
@@ -1627,6 +1647,7 @@ $("#serverForm").addEventListener("submit", async event => {
       if (Number.isInteger(payload.port) && payload.port !== snapshot.port) edit.port = payload.port;
       if (payload.root !== snapshot.root) edit.root = payload.root;
       if (payload.persist !== snapshot.persist) edit.persist = payload.persist;
+      if ((payload.scheduler || "auto") !== (snapshot.scheduler || "auto")) edit.scheduler = payload.scheduler || "auto";
       if (Object.keys(edit).length === 1) {
         $("#serverDialog").close();
         toast("未做任何修改");
@@ -1642,6 +1663,7 @@ $("#serverForm").addEventListener("submit", async event => {
         : `已更新服务器 ${state.editingServer}`);
     } else {
       if (!payload.persist) delete payload.persist;
+      if (!payload.scheduler || payload.scheduler === "auto") delete payload.scheduler;
       await addServer(payload);
       toast(`已添加服务器 ${payload.name}，可点击行切换`);
     }

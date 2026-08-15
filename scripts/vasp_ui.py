@@ -536,6 +536,17 @@ def run_transfer_worker(action_id: str) -> None:
     threading.Thread(target=worker, daemon=True).start()
 
 
+def tool_result_text(result: dict[str, Any], limit: int = 2000) -> str:
+    """Compact, safe text preview of a tool result for the Harness-style UI."""
+    try:
+        text = json.dumps(result, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        text = str(result)
+    if len(text) > limit:
+        text = text[:limit] + f"... (截断，共 {len(text)} 字符)"
+    return text
+
+
 def append_tool_result(chat: ChatState, call: dict[str, Any], result: dict[str, Any]) -> None:
     chat.messages.append({
         "role": "tool",
@@ -682,6 +693,7 @@ def run_chat_loop_stream(emit) -> None:
                 "ok": bool(result.get("ok")),
                 "error": str(result.get("error") or ""),
                 "summary": tool_summary(result),
+                "result_text": tool_result_text(result),
                 # Transfer runs in the background; the front end polls it.
                 "action_id": result.get("action_id"),
             })
@@ -1400,6 +1412,11 @@ class Handler(BaseHTTPRequestHandler):
                 add_args += ["-ServerRoot", root]
             if persist:
                 add_args += ["-ServerPersist", persist]
+            scheduler = str(payload.get("scheduler", "") or "").strip()
+            if scheduler and scheduler != "auto":
+                if scheduler not in ("slurm", "pbs"):
+                    raise ValueError("调度器必须是 auto、slurm 或 pbs")
+                add_args += ["-ServerScheduler", scheduler]
             result = STATE.catalog_controller().run(*add_args)
             if not result.get("ok"):
                 raise ValueError(result.get("error") or result.get("output") or "添加服务器失败")
@@ -1460,6 +1477,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not PERSIST_RE.fullmatch(persist):
                     raise ValueError("persist 值无效（yes/no 或时长如 8h）")
                 edit_args += ["-ServerPersist", persist]
+            scheduler = str(payload.get("scheduler", "")).strip()
+            if scheduler:
+                if scheduler not in ("auto", "slurm", "pbs"):
+                    raise ValueError("调度器必须是 auto、slurm 或 pbs")
+                edit_args += ["-ServerScheduler", scheduler]
             if len(edit_args) == 2:
                 raise ValueError("没有可修改的属性")
             result = STATE.catalog_controller().run(*edit_args)

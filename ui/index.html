@@ -312,6 +312,13 @@
       <div class="two-column">
         <label>SSH 端口<input id="serverPort" type="number" value="22" min="1" max="65535"></label>
         <label>连接保持时长<input id="serverPersist" placeholder="8h（可选）"></label>
+        <label>任务调度器
+          <select id="serverScheduler">
+            <option value="auto">自动检测</option>
+            <option value="slurm">Slurm</option>
+            <option value="pbs">PBS/Torque</option>
+          </select>
+        </label>
       </div>
       <label>远端根路径（留空 = 登录用户主目录；工具只能在此边界内操作）<input id="serverRoot" placeholder="/home/user（不填则用主目录）"></label>
       <p id="serverNote" class="modal-note">密码与六位验证码只在连接时于独立 SSH 窗口输入，任何地方都不会保存。删除会移除目录条目，不影响远端文件。</p>

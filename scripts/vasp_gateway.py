@@ -744,6 +744,7 @@ def do_servers(_: argparse.Namespace) -> int:
                 "port": entry["port"],
                 "root": entry["remote_root"],
                 "persist": entry["persist"],
+                "scheduler": entry.get("scheduler", "auto"),
                 "connected": results.get(name, False),
             }
             for name, entry in CFG["servers"].items()
@@ -849,6 +850,12 @@ def do_server_edit(args: argparse.Namespace) -> int:
     if args.persist is not None:
         entry["persist"] = args.persist
         changed.append("persist")
+    if getattr(args, "scheduler", None) is not None:
+        if args.scheduler not in ("auto", "slurm", "pbs"):
+            raise ValueError("scheduler must be auto, slurm or pbs")
+        entry["scheduler"] = args.scheduler
+        changed.append("scheduler")
+        SCHEDULER_CACHE.pop(name, None)
     if not changed and new_name == name:
         raise ValueError("nothing to change")
     # A live master socket routes every command to the old target; re-pointing
@@ -912,6 +919,7 @@ def parser() -> argparse.ArgumentParser:
     edit_cat.add_argument("--port", type=int, default=None)
     edit_cat.add_argument("--root", default=None, dest="remote_root")
     edit_cat.add_argument("--persist", default=None)
+    edit_cat.add_argument("--scheduler", default=None, choices=["auto", "slurm", "pbs"])
     edit_cat.set_defaults(handler=do_server_edit)
 
     read = sub.add_parser("read", parents=[server])
