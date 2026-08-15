@@ -4,6 +4,13 @@
 
 ## [未发布] — 确定性工作流内核（进行中）
 
+### PBS/Torque 调度器支持
+- gateway 支持 Slurm 与 PBS 双调度器：jobs/recent/submit/cancel 按服务器
+  的 scheduler 字段分派（qstat/qsub/qdel vs squeue/sbatch/scancel）
+- 默认 auto 模式：首次使用时探测登录 shell（command -v qsub/sbatch）并缓存
+- 目录新增 --scheduler auto|slurm|pbs 选项；job id 校验放宽支持 PBS 的
+  "12345.hostname" 与 Slurm 数组 "12345_1"
+
 ### 真实案例收集与解析器对齐（14 案例）
 - 从 cl9 真实历史数据收集 14 个脱敏案例（eval/cases/，不入库）：7 个离子收敛、
   2 个失败（EDDDAV+ZHEGV、NELM）、1 个运行中、4 个未启动
