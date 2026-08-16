@@ -21,7 +21,10 @@ if ($LASTEXITCODE -ne 0) { throw "Could not prepare the Vlab directories." }
 & scp -q -i $key -o StrictHostKeyChecking=ask -o UpdateHostKeys=no $gateway "${target}:~/bin/vasp-remote-agent"
 if ($LASTEXITCODE -ne 0) { throw "Could not copy the gateway helper." }
 
-& ssh -q -i $key -o StrictHostKeyChecking=ask -o UpdateHostKeys=no $target "chmod 700 ~/bin/vasp-remote-agent && python3 -m py_compile ~/bin/vasp-remote-agent"
+# Normalize CRLF -> LF on the gateway. Windows scp copies bytes as-is; a
+# CRLF shebang makes the kernel look for "python3" and every gateway
+# command dies with /usr/bin/env errors.
+& ssh -q -i $key -o StrictHostKeyChecking=ask -o UpdateHostKeys=no $target "sed -i 's/\r`$//' ~/bin/vasp-remote-agent && chmod 700 ~/bin/vasp-remote-agent && python3 -m py_compile ~/bin/vasp-remote-agent"
 if ($LASTEXITCODE -ne 0) { throw "The gateway helper failed validation on Vlab." }
 
 Write-Host "Installed. Next run: ./scripts/vasp-agent.ps1 connect -IdentityFile `"$key`""

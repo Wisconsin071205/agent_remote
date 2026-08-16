@@ -317,7 +317,7 @@ TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "run_remote_command",
-            "description": "Execute one whitelisted ANALYSIS command inside a remote calculation directory (python3/gnuplot/awk/bc/cat/grep/tail/... only; 300s timeout). Use for post-processing such as plotting DOS/bands from DOSCAR/EIGENVAL. Cannot delete, submit or transfer anything. Requires local approval; the command is shown before execution.",
+            "description": "Execute one whitelisted ANALYSIS command inside a remote calculation directory (python3/gnuplot/awk/bc/cat/grep/tail/... only; 300s timeout; max 2000 chars; no quotes or ;|& chaining). For anything longer than one line, upload the script with upload_file first, then run it with a short command like 'python3 plot_dos.py 500'. Cannot delete, submit or transfer anything. Requires local approval; the command is shown before execution.",
             "parameters": {
                 "type": "object",
                 "properties": {

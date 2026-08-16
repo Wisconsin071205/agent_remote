@@ -93,7 +93,16 @@ scripts\vasp-agent.ps1 run -RemotePath 计算目录 -Command "python3 plot_dos.p
 scripts\vasp-agent.ps1 diagnostic -Diagnostic scheduler -ServerName cl9
 ```
 
-`run` 只允许白名单前缀：`python3 python gnuplot bash sh awk bc cat grep tail head wc sort uniq paste module`，300 秒超时，其余（rm/scp/ssh…）一律拒绝。
+`run` 只允许白名单前缀：`python3 python gnuplot bash sh awk bc cat grep tail head wc sort uniq paste module`，300 秒超时、单条命令最长 2000 字符、禁止引号与 `; | &` 串联，其余（rm/scp/ssh…）一律拒绝。
+
+**长脚本请用脚本文件模式**（HPC 标准做法，避免多层 shell 转义问题）：
+
+```powershell
+# 1. 上传脚本到计算目录
+scripts\vasp-agent.ps1 upload -LocalPath plot_dos.py -RemotePath 计算目录/plot_dos.py
+# 2. 用短命令执行
+scripts\vasp-agent.ps1 run -RemotePath 计算目录 -Command "python3 plot_dos.py 500"
+```
 
 ### 8.2 确定性工作流工具（py -3.12 推荐）
 

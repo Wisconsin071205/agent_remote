@@ -636,11 +636,13 @@ def do_run(args: argparse.Namespace) -> int:
     """Execute one whitelisted analysis command inside a remote directory."""
     name, entry = resolve_server(args.server)
     directory = validated_remote_path(args.directory, entry, name)
-    raw = (args.command or "").strip()
+    raw = (args.command or "").replace("\r", "").strip()
     if not raw:
         raise ValueError("run requires -Command")
-    if len(raw) > 500:
-        raise ValueError("command too long (max 500 characters)")
+    if len(raw) > 2000:
+        raise ValueError("command too long (max 2000 characters); for longer work upload a script file and run it with a short command")
+    if "\n" in raw or ";" in raw or "|" in raw or "&" in raw:
+        raise ValueError("command chaining characters (; | & newline) are not allowed; upload a script file and run it with a short command")
     first = raw.split()[0].split("/")[-1] if raw.split() else ""
     if first not in RUN_ALLOWED_PREFIXES:
         raise ValueError(
