@@ -53,6 +53,16 @@ class LocalStore:
         # VASPILOT_LOCAL_FILE override is for tests.
         self.path = path or os.environ.get("VASPILOT_LOCAL_FILE") or DEFAULT_PATH
 
+    def get_identity_file(self) -> str:
+        """The persisted Vlab PEM path (may be empty when not yet set)."""
+        data = self._load()
+        return str(data.get("identity_file") or "")
+
+    def set_identity_file(self, value: str) -> None:
+        data = self._load()
+        data["identity_file"] = value
+        self._write(data)
+
     def _load(self):
         try:
             with open(self.path, "r", encoding="utf-8-sig") as fh:

@@ -133,9 +133,13 @@ class AppState:
         # created}. Approved transfers run in a worker thread; the UI polls.
         self.pending_actions: dict[str, dict[str, Any]] = {}
         self.api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+        self.local = LocalStore()
         default_identity = Path.home() / ".ssh" / "vlab-identity.pem"
+        # Priority: environment override -> saved setting -> default path.
+        persisted_identity = self.local.get_identity_file()
         self.identity_file = os.environ.get(
-            "VLAB_IDENTITY_FILE", str(default_identity) if default_identity.is_file() else ""
+            "VLAB_IDENTITY_FILE",
+            persisted_identity or (str(default_identity) if default_identity.is_file() else ""),
         )
         self.model = os.environ.get("DEEPSEEK_MODEL", AGENT.DEFAULT_MODEL)
         self.base_url = os.environ.get("DEEPSEEK_BASE_URL", AGENT.DEFAULT_BASE_URL)
@@ -144,7 +148,6 @@ class AppState:
         # {id, name, base_url, model} has its own API key held in memory only
         # (self.provider_keys), so switching models between providers never
         # rewrites settings.
-        self.local = LocalStore()
         self.models = self.local.get_models()
         self.providers = self.local.list_providers()
         self.provider_keys: dict[str, str] = {}
@@ -1266,6 +1269,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_config_path(self, path: str, payload: dict[str, Any]) -> None:
         if path == "/api/config":
+            if "identity_file" in payload:
+                # Persist the Vlab PEM path so the pre-flight check and every
+                # later session see the user's choice (previously this field
+                # was silently dropped: saving "had no effect").
+                raw_identity = str(payload.get("identity_file") or "").strip()
+                if raw_identity and len(raw_identity) > 300:
+                    raise ValueError("PEM 路径过长")
+                STATE.identity_file = raw_identity
+                STATE.local.set_identity_file(raw_identity)
             if "providers" in payload:
                 raw = payload["providers"]
                 if not isinstance(raw, list):
@@ -1299,7 +1311,7 @@ class Handler(BaseHTTPRequestHandler):
                         STATE.provider_keys[p["id"]] = key
                         STATE.stored_keys[p["id"]] = dpapi_protect(key)
                         STATE.local.save_provider_key(p["id"], STATE.stored_keys[p["id"]])
-                if not any(p["id"] == STATE.current_provider for p in STATE.providers):
+                if STATE.providers and not any(p["id"] == STATE.current_provider for p in STATE.providers):
                     STATE.current_provider = STATE.providers[0]["id"]
                     STATE.local.set_current_provider(STATE.current_provider)
             if "current_provider" in payload:
