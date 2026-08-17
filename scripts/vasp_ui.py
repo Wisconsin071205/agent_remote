@@ -385,6 +385,10 @@ def execute_tool(controller: Any, name: str, arguments: dict[str, Any]) -> dict[
         if entry is None:
             return {"ok": False, "error": f"服务器目录中没有 {target}"}
         STATE.active_server = target
+        # Keep this turn's controller in sync, otherwise the rest of the turn
+        # would still route every write to the OLD server while approval and
+        # context show the new one.
+        controller.server = target
         # Rewrite the per-turn context so the model knows the new active server.
         chat = STATE.chat
         if chat is not None and chat.context_index is not None:

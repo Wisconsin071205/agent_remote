@@ -455,8 +455,12 @@ def do_mkdir(args: argparse.Namespace) -> int:
     return result.returncode
 
 
-def require_not_root(path: str, entry: dict) -> None:
-    if PurePosixPath(path) == PurePosixPath(entry["remote_root"]):
+def require_not_root(name: str, path: str, entry: dict) -> None:
+    # Compare against the EFFECTIVE root (which resolves an empty remote_root
+    # to the login home via a live connection). Comparing the raw remote_root
+    # string leaves the home-directory boundary unprotected: PurePosixPath("")
+    # equals "." and never matches an absolute home path.
+    if PurePosixPath(path) == effective_root(name, entry):
         raise ValueError("operation is not allowed on the remote root itself")
 
 
@@ -464,8 +468,8 @@ def do_copy(args: argparse.Namespace) -> int:
     name, entry = resolve_server(args.server)
     source = validated_remote_path(args.source, entry, name)
     destination = validated_remote_path(args.destination, entry, name)
-    require_not_root(source, entry)
-    require_not_root(destination, entry)
+    require_not_root(name, source, entry)
+    require_not_root(name, destination, entry)
     result = remote(name, f"cp -r -- {shlex.quote(source)} {shlex.quote(destination)}")
     audit("copy", "ok" if result.returncode == 0 else "failed", f"{source} -> {destination}", name)
     return result.returncode
@@ -475,8 +479,8 @@ def do_move(args: argparse.Namespace) -> int:
     name, entry = resolve_server(args.server)
     source = validated_remote_path(args.source, entry, name)
     destination = validated_remote_path(args.destination, entry, name)
-    require_not_root(source, entry)
-    require_not_root(destination, entry)
+    require_not_root(name, source, entry)
+    require_not_root(name, destination, entry)
     result = remote(name, f"mv -- {shlex.quote(source)} {shlex.quote(destination)}")
     audit("move", "ok" if result.returncode == 0 else "failed", f"{source} -> {destination}", name)
     return result.returncode
@@ -498,7 +502,7 @@ def do_remove(args: argparse.Namespace) -> int:
     """
     name, entry = resolve_server(args.server)
     path = validated_remote_path(args.path, entry, name)
-    require_not_root(path, entry)
+    require_not_root(name, path, entry)
     trash_root = trash_root_for(name, entry)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
     destination = f"{trash_root}/{stamp}_{PurePosixPath(path).name}"
@@ -641,8 +645,10 @@ def do_run(args: argparse.Namespace) -> int:
         raise ValueError("run requires -Command")
     if len(raw) > 2000:
         raise ValueError("command too long (max 2000 characters); for longer work upload a script file and run it with a short command")
-    if "\n" in raw or ";" in raw or "|" in raw or "&" in raw:
-        raise ValueError("command chaining characters (; | & newline) are not allowed; upload a script file and run it with a short command")
+    if any(ch in raw for ch in "\n;|&`$<>"):
+        raise ValueError(
+            "command chaining / shell metacharacters (; | & newline, $, backtick, < >) are not allowed; "
+            "upload a script file and run it with a short command")
     first = raw.split()[0].split("/")[-1] if raw.split() else ""
     if first not in RUN_ALLOWED_PREFIXES:
         raise ValueError(
@@ -736,8 +742,8 @@ def do_transfer(args: argparse.Namespace) -> int:
     require_connection(to_name)
     from_path = validated_remote_path(args.from_path, from_entry, from_name)
     to_path = validated_remote_path(args.to_path, to_entry, to_name)
-    require_not_root(from_path, from_entry)
-    require_not_root(to_path, to_entry)
+    require_not_root(from_name, from_path, from_entry)
+    require_not_root(to_name, to_path, to_entry)
     stage = Path("/tmp") / f"vasp-remote-agent-transfer-{secrets.token_hex(6)}"
     detail = f"{from_path} ({from_name}) -> {to_path} ({to_name})"
     try:

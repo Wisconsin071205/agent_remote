@@ -63,7 +63,9 @@ class PatchError(RuntimeError):
 def apply_hunk(original: list[str], hunk_lines: list[str], old_start: int) -> list[str]:
     """Apply one hunk; returns the COMPLETE new line list."""
     out: list[str] = []
-    pos = old_start - 1  # 0-based line index in original
+    # old_start == 0 marks an insertion at the very top (@@ -0,0 ...); clamp to
+    # 0 so the prefix is empty instead of -1 (which would drop the last line).
+    pos = max(0, old_start - 1)  # 0-based line index in original
     out.extend(original[:pos])  # untouched prefix before the hunk
     index = 0
     while index < len(hunk_lines):

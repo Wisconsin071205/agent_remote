@@ -212,15 +212,16 @@ def main(argv: list[str] | None = None) -> int:
     ]
 
     # ---- stage 2: static ----
-    # Force IBRION=-1 / NSW=0 (static policy), ensure CHGCAR retention, then
-    # re-apply user overrides (no-ops are skipped by apply_incar_edits).
+    # relax_incar already carries the user overrides. Force IBRION=-1 / NSW=0
+    # LAST (STATIC_FORCE) so a user `--set NSW=...` / `IBRION=...` can never turn
+    # the static stage back into a relaxation; other overrides (e.g. ENCUT) are
+    # preserved. CHGCAR retention (LCHARG) is also enforced here.
     static_incar_raw, force_mods = apply_incar_edits(relax_incar, STATIC_FORCE)
     modifications += force_mods
     if "LCHARG" not in parse_incar_lines(static_incar_raw):
         static_incar_raw, lc_mods = apply_incar_edits(static_incar_raw, {"LCHARG": ".TRUE."})
         modifications += lc_mods
-    static_incar, static_mods = apply_incar_edits(static_incar_raw, overrides)
-    modifications += static_mods
+    static_incar = static_incar_raw
     static_dir = base / system / STATIC_STAGE
     static_files: dict[str, Any] = {}
     static_writes = [

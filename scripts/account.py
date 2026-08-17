@@ -110,7 +110,7 @@ class AccountStore:
             stored = base64.b64decode(record["hash"])
             digest = self._hash(password, salt)
             return hmac.compare_digest(digest, stored)
-        except (KeyError, TypeError, ValueError):
+        except (KeyError, AttributeError, TypeError, ValueError):
             return False
 
     def _hash(self, password, salt):

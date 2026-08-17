@@ -14,6 +14,7 @@ Windows account being the one that runs this app at all.
 """
 
 import base64
+import binascii
 import ctypes
 import os
 from ctypes import wintypes
@@ -63,7 +64,10 @@ def unprotect(ciphertext_b64: str) -> str:
     invalid or belongs to another Windows user / machine."""
     if os.name != "nt":
         raise OSError("DPAPI encryption is only available on Windows")
-    raw = base64.b64decode(ciphertext_b64)
+    try:
+        raw = base64.b64decode(ciphertext_b64)
+    except (binascii.Error, ValueError) as exc:
+        raise OSError("invalid ciphertext") from exc
     blob_in = _blob(raw)
     blob_out = _DataBlob()
     if not _crypt_unprotect(
@@ -71,4 +75,7 @@ def unprotect(ciphertext_b64: str) -> str:
         CRYPTPROTECT_UI_FORBIDDEN, ctypes.byref(blob_out),
     ):
         raise OSError(ctypes.get_last_error() or 1, "CryptUnprotectData failed")
-    return _to_bytes(blob_out).decode("utf-8")
+    try:
+        return _to_bytes(blob_out).decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise OSError("decrypted plaintext is not valid UTF-8") from exc

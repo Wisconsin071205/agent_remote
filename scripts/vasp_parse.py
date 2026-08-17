@@ -166,8 +166,9 @@ def parse_kpoints(raw: str) -> dict[str, Any]:
     info: dict[str, Any] = {"type": "unknown"}
     if not lines:
         return info
-    # Line-mode (能带): 4th line starts with 'l'/'L' (ignoring the auto header).
-    explicit = lines[3] if len(lines) > 3 else ""
+    # Line-mode (能带): "Line-mode"/"Line mode" sits on the 3rd line (index 2),
+    # after the comment (0), subdivision count (1), and before Reciprocal/Cartesian (3).
+    explicit = lines[2] if len(lines) > 2 else ""
     if explicit.lower().startswith("l"):
         info["type"] = "line"
         coords = lines[4:]
@@ -242,7 +243,7 @@ def parse_outcar_tail(raw: str) -> dict[str, Any]:
     m = re.search(r"vasp\.([0-9.]+)", raw, re.I)
     if m:
         info["vasp_version"] = m.group(1)
-    if "General timing and accounting informations for this job" in raw:
+    if "General timing and accounting information for this job" in raw:
         info["completed"] = True
     else:
         info["completed"] = False

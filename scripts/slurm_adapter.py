@@ -332,7 +332,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.operation == "probe":
         print(json.dumps(detect_version(runner), ensure_ascii=False, indent=2))
     elif args.operation == "submit":
-        print(json.dumps(submit(runner, args.directory, args.script), ensure_ascii=False, indent=2))
+        outcome = submit(runner, args.directory, args.script)
+        print(json.dumps(outcome, ensure_ascii=False, indent=2))
+        if not outcome.get("ok"):
+            return 1
     elif args.operation == "query":
         print(json.dumps(query(runner, args.job_ids), ensure_ascii=False, indent=2))
     elif args.operation == "history":

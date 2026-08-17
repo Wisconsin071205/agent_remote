@@ -114,6 +114,8 @@ class ConversationStore:
         """Remove a project's whole conversation directory. The project id
         already passed the charset check in _subdir, so this cannot escape
         the conversation root."""
+        if project is None:
+            raise ValueError("无效的项目编号")
         subdir = self._subdir(project)
         if subdir.is_dir():
             shutil.rmtree(subdir)
